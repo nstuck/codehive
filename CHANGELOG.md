@@ -6,6 +6,8 @@ Each build is also published on the [releases page](https://github.com/nstuck/co
 
 ## [Unreleased]
 
+## [2026.10.02.1] - 2026-10-02
+
 ### Added
 
 - `codehive off` stops every server, including the launcher, and keeps them stopped across reboots until `codehive on`. The launcher can run `codehive off` when you ask it to.
@@ -34,5 +36,6 @@ The first release.
 - `codehive update` to reinstall from the repo and branch codehive came from.
 - Server output is filtered before it reaches the journal, so status redraws don't flood the logs.
 
-[Unreleased]: https://github.com/nstuck/codehive/compare/v2026.10.02...HEAD
+[Unreleased]: https://github.com/nstuck/codehive/compare/v2026.10.02.1...HEAD
+[2026.10.02.1]: https://github.com/nstuck/codehive/releases/tag/v2026.10.02.1
 [2026.10.02]: https://github.com/nstuck/codehive/releases/tag/v2026.10.02
