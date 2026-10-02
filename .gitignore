@@ -1,3 +1,14 @@
 # Claude Code: session worktrees and personal settings
 .claude/worktrees/
 .claude/settings.local.json
+
+# Editor/OS junk
+*.swp
+*~
+.DS_Store
+.vscode/
+.idea/
+
+# Local secrets or a real config copied from config.example
+.env
+/config
