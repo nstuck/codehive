@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+# Filter a Remote Control server's output for the journal.
+# Without a terminal, the server's status display redraws about once a second
+# and every redraw becomes a log line. This strips terminal escape codes and
+# drops lines that were already printed in the last WINDOW seconds, so a
+# steady state is logged once and each change is logged when it happens.
+import os, re, signal, sys, time
+
+WINDOW = 30
+
+# Keep running when systemd stops the unit, so the server's last lines still
+# get logged. The filter exits when the server closes its output.
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+LINK = re.compile(r"\x1b\]8;[^;\x07\x1b]*;([^\x07\x1b]*)(?:\x07|\x1b\\)(.*?)\x1b\]8;;(?:\x07|\x1b\\)")
+OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
+CSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+ESC = re.compile(r"\x1b[@-Z\\-_]")
+BREAK = re.compile(r"\r\n|\r|\n")
+
+
+def clean(line):
+    line = LINK.sub(lambda m: f"{m.group(2)} ({m.group(1)})" if m.group(2) else m.group(1), line)
+    for pattern in (OSC, CSI, ESC):
+        line = pattern.sub("", line)
+    return line.rstrip()
+
+
+seen = {}
+buf = ""
+while True:
+    chunk = os.read(0, 65536)
+    if not chunk:
+        break
+    buf += chunk.decode("utf-8", "replace")
+    *lines, buf = BREAK.split(buf)
+    now = time.monotonic()
+    for raw in lines:
+        line = clean(raw)
+        if not line.strip():
+            continue
+        last = seen.get(line)
+        seen[line] = now
+        if last is None or now - last > WINDOW:
+            sys.stdout.write(line + "\n")
+    sys.stdout.flush()
+    if len(seen) > 1000:
+        seen = {k: v for k, v in seen.items() if now - v <= WINDOW}
+
+if clean(buf).strip():
+    sys.stdout.write(clean(buf) + "\n")

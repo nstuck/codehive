@@ -1,0 +1,210 @@
+#!/usr/bin/env bash
+# codehive: manage the Claude Code Remote Control servers on this machine.
+set -euo pipefail
+export CODEHIVE_CONFIG="${CODEHIVE_CONFIG:-@CODEHIVE_CONFIG@}"
+export CODEHIVE_DATA="${CODEHIVE_DATA:-@CODEHIVE_DATA@}"
+# shellcheck source=lib/common.sh
+. "$CODEHIVE_DATA/lib/common.sh"
+
+usage() {
+  cat <<EOF
+usage: codehive <command> [args]
+
+  new <name> [--in <dir>]   create a git project and start its server
+                            (in the first project folder unless --in is given)
+  status                    show the launcher, watches, and every project server
+  logs <project> [args]     show a server's log (extra args go to journalctl, e.g. -f)
+  restart [<project>]       restart one server, or all of them (after a Claude Code update)
+  sync                      match servers to project folders now
+  trust <path>...           mark folders as trusted, as if you accepted the trust
+                            dialog, and start their servers
+  untrust <path>...         stop trusting folders and stop their servers
+  dirs                      list the configured project folders
+  version                   show the installed version and check for a newer one
+  update [--ref <ref>] [--repo <owner/name>] [installer options]
+                            reinstall from the repo and branch codehive came from;
+                            running servers keep going until \`codehive restart\`
+  uninstall [--purge]       remove codehive (project folders are never touched)
+
+<project> is a folder name, a path, or "launcher".
+Config: $CODEHIVE_CONFIG
+EOF
+}
+
+sync_now() { systemctl --user start claude-rc-sync.service; }
+
+# Print the unit for a project given by name, path, or "launcher"
+resolve_unit() {
+  local arg="$1" dir root matches=()
+  if [ "$arg" = launcher ]; then echo claude-rc-launcher.service; return; fi
+  if [[ "$arg" == */* ]] && [ -d "$arg" ]; then
+    matches=("$(normpath "$arg")")
+  else
+    for root in "${PROJECT_DIRS[@]}"; do
+      [ -d "$root/$arg" ] && matches+=("$root/$arg")
+    done
+  fi
+  case ${#matches[@]} in
+    0) die "no project named '$arg' in: ${PROJECT_DIRS[*]}" ;;
+    1) unit_for "${matches[0]}" ;;
+    *) die "'$arg' is ambiguous; use a path: ${matches[*]}" ;;
+  esac
+}
+
+cmd_new() {
+  local name="" root="${PROJECT_DIRS[0]}" in="" r
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --in) in="${2:?--in needs a folder}"; shift 2 ;;
+      -*) die "unknown option: $1" ;;
+      *) [ -z "$name" ] || die "usage: codehive new <name> [--in <dir>]"; name="$1"; shift ;;
+    esac
+  done
+  [ -n "$name" ] || die "usage: codehive new <name> [--in <dir>]"
+  valid_name "$name" || die "use only letters, numbers, . _ - (starting with a letter or number)"
+
+  if [ -n "$in" ]; then
+    root=""
+    for r in "${PROJECT_DIRS[@]}"; do
+      if [ "$r" = "$(normpath "$in")" ] || [ "$(basename "$r")" = "$in" ]; then root="$r"; break; fi
+    done
+    [ -n "$root" ] || die "'$in' is not a configured project folder: ${PROJECT_DIRS[*]}"
+  fi
+
+  local dir="$root/$name" created=0
+  [ -e "$dir" ] || created=1
+  mkdir -p "$dir"
+  [ -d "$dir/.git" ] || git -C "$dir" init -q
+  # worktree mode needs at least one commit
+  git -C "$dir" rev-parse --verify HEAD >/dev/null 2>&1 \
+    || git -C "$dir" commit -q --allow-empty -m "Initial commit"
+
+  # A folder made just now holds nothing but the empty repo, so it's safe to
+  # trust. An existing folder could hold anything; trusting it is up to you.
+  if [ "$created" = 1 ]; then
+    "$CODEHIVE_DATA/libexec/claude-trust" "$dir"
+  elif [ "$AUTO_TRUST" != 1 ] && [ "$(is_trusted "$dir")" != yes ]; then
+    sync_now
+    echo "$dir already existed and isn't trusted, so its server won't start."
+    echo "Review it, then run: codehive trust $dir"
+    return
+  fi
+
+  sync_now
+  echo "Started Remote Control for $name ($dir)"
+}
+
+state_of() {
+  local s
+  s="$(systemctl --user is-active "$1" 2>/dev/null)" || true
+  echo "${s:-unknown}"
+}
+
+cmd_status() {
+  local root dir unit mode trust
+  printf '%-28s %s\n' "launcher" "$(state_of claude-rc-launcher.service)"
+  printf '%-28s %s\n' "sync timer" "$(state_of claude-rc-sync.timer)"
+  for root in "${PROJECT_DIRS[@]}"; do
+    echo
+    echo "$root  (watch: $(state_of "claude-rc-watch@$(systemd-escape --path "$root").path"))"
+    [ -d "$root" ] || { echo "  (folder missing)"; continue; }
+    for dir in "$root"/*/; do
+      [ -d "$dir" ] || continue
+      dir="${dir%/}"
+      if [ -e "$dir/.no-rc" ]; then
+        printf '  %-26s %s\n' "$(basename "$dir")" "excluded (.no-rc)"
+        continue
+      fi
+      unit="$(unit_for "$dir")"
+      case "$unit" in claude-rc@*) mode=worktree ;; *) mode=same-dir ;; esac
+      trust=""
+      if [ "$(is_trusted "$dir")" = no ]; then
+        if [ "$AUTO_TRUST" = 1 ]; then trust="  not trusted (run: codehive sync)"
+        else trust="  not trusted (review it, then: codehive trust $dir)"; fi
+      fi
+      printf '  %-26s %-10s %s%s\n' "$(basename "$dir")" "$(state_of "$unit")" "$mode" "$trust"
+    done
+  done
+  local notice
+  notice="$(update_notice)"
+  [ -z "$notice" ] || printf '\n%s\n' "$notice"
+}
+
+cmd_version() {
+  echo "codehive $(installed_version)"
+  if [ "$UPDATE_CHECK" = 1 ]; then
+    local result notice
+    result="$("$CODEHIVE_DATA/libexec/claude-rc-update-check")"
+    notice="$(update_notice)"
+    echo "${notice:-$result}"
+  else
+    echo "Update checks are off (UPDATE_CHECK=0)."
+  fi
+}
+
+cmd_restart() {
+  if [ $# -eq 0 ]; then
+    systemctl --user restart claude-rc-launcher.service
+    list_instance_units | while IFS= read -r unit; do
+      systemctl --user try-restart "$unit"
+    done
+    echo "Restarted all servers"
+  else
+    local unit
+    unit="$(resolve_unit "$1")"
+    systemctl --user restart "$unit"
+    echo "Restarted $1"
+  fi
+}
+
+# Download the installer from where this install came from and run it
+cmd_update() {
+  local CODEHIVE_REPO=nstuck/codehive CODEHIVE_REF=main CODEHIVE_CHECKOUT="" args=() tmp status=0
+  # shellcheck source=/dev/null
+  [ -r "$CODEHIVE_DATA/source" ] && . "$CODEHIVE_DATA/source"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --ref)  CODEHIVE_REF="${2:?--ref needs a branch or tag}"; CODEHIVE_CHECKOUT=""; shift 2 ;;
+      --repo) CODEHIVE_REPO="${2:?--repo needs owner/name}"; CODEHIVE_CHECKOUT=""; shift 2 ;;
+      *)      args+=("$1"); shift ;;
+    esac
+  done
+  [ -z "$CODEHIVE_CHECKOUT" ] || die "installed from the checkout at $CODEHIVE_CHECKOUT;" \
+    "run \`git pull && ./install.sh\` there, or \`codehive update --ref main\` to install from GitHub"
+
+  echo "Updating codehive from $CODEHIVE_REPO@$CODEHIVE_REF..."
+  tmp="$(mktemp)"
+  if ! curl -fsSL -o "$tmp" "https://raw.githubusercontent.com/$CODEHIVE_REPO/$CODEHIVE_REF/install.sh"; then
+    rm -f "$tmp"
+    die "couldn't download the installer for $CODEHIVE_REPO@$CODEHIVE_REF"
+  fi
+  CODEHIVE_REPO="$CODEHIVE_REPO" CODEHIVE_REF="$CODEHIVE_REF" \
+    bash "$tmp" ${args[@]+"${args[@]}"} || status=$?
+  rm -f "$tmp"
+  return "$status"
+}
+
+cmd="${1:-help}"
+[ $# -gt 0 ] && shift
+case "$cmd" in
+  new)       cmd_new "$@" ;;
+  status)    cmd_status ;;
+  logs)      [ $# -ge 1 ] || die "usage: codehive logs <project> [journalctl args]"
+             unit="$(resolve_unit "$1")"; shift
+             exec journalctl --user -u "$unit" "${@:--n50}" ;;
+  restart)   cmd_restart "$@" ;;
+  sync)      sync_now ;;
+  trust)     [ $# -ge 1 ] || die "usage: codehive trust <path>..."
+             "$CODEHIVE_DATA/libexec/claude-trust" "$@"; sync_now ;;
+  untrust)   [ $# -ge 1 ] || die "usage: codehive untrust <path>..."
+             "$CODEHIVE_DATA/libexec/claude-trust" --remove "$@"
+             [ "$AUTO_TRUST" = 1 ] && warn "AUTO_TRUST=1 trusts every project again on the next sync;" \
+               "mark a project with .no-rc to keep it off"
+             sync_now ;;
+  dirs)      printf '%s\n' "${PROJECT_DIRS[@]}" ;;
+  version|--version) cmd_version ;;
+  update)    cmd_update "$@" ;;
+  uninstall) exec "$CODEHIVE_DATA/uninstall.sh" "$@" ;;
+  help|-h|--help) usage ;;
+  *)         usage >&2; exit 1 ;;
+esac

@@ -1,0 +1,20 @@
+This is the launcher workspace. Projects live in these folders, not here:
+@PROJECT_DIRS_LIST@
+
+To create a new project, run `@BIN_DIR@/codehive new <name>`
+(lowercase, letters/numbers/dashes, no spaces). It goes in the first folder
+above unless I name another one; then add `--in <folder>`.
+Then tell me it's ready under that name in the Code tab.
+Don't create project files in this folder.
+
+Don't run `codehive trust` or `codehive untrust` unless I ask for it in
+this conversation and name the folder. Trusting a folder lets its settings
+run commands on this server.
+
+Don't run `codehive update`, `restart`, or `uninstall`, or the installer.
+They stop or restart the server this session runs on, which would cut
+them off partway. If I ask for one, give me the command to run over SSH.
+
+If this session starts with a notice that a new codehive version is
+available, tell me once, at the start of your first reply, with the release
+notes link and the command to run over SSH.

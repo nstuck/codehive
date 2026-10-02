@@ -1,0 +1,8 @@
+[Unit]
+Description=Sync Claude Remote Control servers with the project folders
+
+[Service]
+Type=oneshot
+Environment="PATH=@PATH@"
+Environment="CODEHIVE_CONFIG=@CODEHIVE_CONFIG@" "CODEHIVE_DATA=@CODEHIVE_DATA@"
+ExecStart="@LIBEXEC@/claude-rc-sync"

@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch %f for new and removed Claude Code projects
+
+[Path]
+PathChanged=%f
+Unit=claude-rc-sync.service
+
+[Install]
+WantedBy=paths.target

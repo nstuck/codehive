@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Check GitHub for a newer codehive release and remember it for `codehive
+# status` and the launcher. Run once a day by claude-rc-update-check.timer.
+# usage: claude-rc-update-check            check now
+#        claude-rc-update-check --notice   print the notice, if there is one
+set -uo pipefail
+# shellcheck source=lib/common.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
+
+if [ "${1:-}" = --notice ]; then
+  update_notice
+  exit 0
+fi
+
+state="$CODEHIVE_DATA/update-available"
+if [ "$UPDATE_CHECK" != 1 ]; then
+  rm -f "$state"
+  exit 0
+fi
+
+# Check the repo this install came from
+CODEHIVE_REPO=nstuck/codehive CODEHIVE_CHECKOUT=""
+# shellcheck source=/dev/null
+[ -r "$CODEHIVE_DATA/source" ] && . "$CODEHIVE_DATA/source"
+repo="$CODEHIVE_REPO"
+if [ -n "$CODEHIVE_CHECKOUT" ]; then
+  url="$(git -C "$CODEHIVE_CHECKOUT" remote get-url origin 2>/dev/null)" || url=""
+  case "$url" in
+    *github.com[:/]*) repo="${url#*github.com[:/]}"; repo="${repo%.git}" ;;
+    *) echo "the checkout at $CODEHIVE_CHECKOUT isn't from GitHub; not checking"; exit 0 ;;
+  esac
+fi
+
+body="$(mktemp)"
+trap 'rm -f "$body"' EXIT
+code="$(curl -sSL --max-time 30 -o "$body" -w '%{http_code}' \
+  -H 'Accept: application/vnd.github+json' \
+  "https://api.github.com/repos/$repo/releases/latest")" || code=""
+case "$code" in
+  200) ;;
+  404) echo "$repo has no releases yet"; rm -f "$state"; exit 0 ;;
+  *)   echo "couldn't check $repo for updates (HTTP ${code:-error}); trying again tomorrow"; exit 0 ;;
+esac
+
+read -r tag release_url < <(python3 -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(d["tag_name"], d["html_url"])' "$body") || { echo "unexpected reply from GitHub"; exit 0; }
+
+latest="${tag#v}"
+installed="$(installed_version)"
+if [ "$installed" = unknown ] || version_gt "$latest" "$installed"; then
+  printf '%s\n%s\n' "$latest" "$release_url" >"$state"
+  echo "codehive $latest is available (installed: $installed)"
+else
+  rm -f "$state"
+  echo "codehive $installed is up to date (latest release: $latest)"
+fi

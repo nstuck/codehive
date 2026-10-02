@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [@LAUNCHER_ALLOW@]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          { "type": "command", "command": "\"@LIBEXEC@/claude-rc-update-check\" --notice" }
+        ]
+      }
+    ]
+  }
+}

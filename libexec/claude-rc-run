@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Start a Remote Control server in the current folder.
+# usage: claude-rc-run <spawn-mode> [name]
+# Without a name, the folder name is used, prefixed with its parent folder's
+# name when another project root has a project with the same name.
+set -euo pipefail
+# shellcheck source=lib/common.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
+
+mode="${1:?usage: claude-rc-run <spawn-mode> [name]}"
+dir="$(normpath "$PWD")"
+name="${2:-}"
+
+if [ -z "$name" ]; then
+  base="$(basename "$dir")"
+  parent="$(dirname "$dir")"
+  name="$base"
+  for root in "${PROJECT_DIRS[@]}"; do
+    if [ "$root" != "$parent" ] && [ -d "$root/$base" ] && [ ! -e "$root/$base/.no-rc" ]; then
+      name="$(basename "$parent")/$base"
+      break
+    fi
+  done
+fi
+
+args=(remote-control --name "$name" --spawn "$mode")
+[ -n "$PERMISSION_MODE" ] && args+=(--permission-mode "$PERMISSION_MODE")
+
+# Without a terminal, every redraw of the status display would become a log
+# line. Send output through a filter that keeps only lines that changed, and
+# exec so the server stays the main process that systemd signals.
+exec > >("$(dirname "$(readlink -f "$0")")/claude-rc-logfilter") 2>&1
+exec "${CLAUDE_BIN:-claude}" "${args[@]}"

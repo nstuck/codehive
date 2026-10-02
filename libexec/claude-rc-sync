@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Match Remote Control servers to the project folders under PROJECT_DIRS:
+# start a server for each trusted project, switch it to worktree mode once it
+# has a commit, and stop servers whose folder is gone, excluded, untrusted, or
+# no longer under a root. With AUTO_TRUST=1, every project is trusted first.
+set -uo pipefail
+# shellcheck source=lib/common.sh
+. "$(dirname "$(readlink -f "$0")")/../lib/common.sh"
+
+# The timer, the folder watches, and `codehive new` can all trigger a sync
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/codehive-sync.lock"
+flock 9
+
+for root in "${PROJECT_DIRS[@]}"; do
+  [ -d "$root" ] || warn "project folder missing: $root"
+done
+
+mapfile -t projects < <(list_projects)
+
+# Servers can't answer the trust dialog, so a project only gets a server once
+# it's trusted. Checking on every pass also restores an entry if a Claude Code
+# process overwrites ~/.claude.json and drops it.
+trust="$(dirname "$(readlink -f "$0")")/claude-trust"
+if [ ${#projects[@]} -gt 0 ]; then
+  [ "$AUTO_TRUST" = 1 ] && "$trust" "${projects[@]}"
+  # If trust can't be read, change nothing rather than stop every server
+  trusted="$("$trust" --check "${projects[@]}")" || die "couldn't read workspace trust; leaving servers as they are"
+  mapfile -t projects < <([ -n "$trusted" ] && printf '%s\n' "$trusted")
+fi
+
+declare -A wanted=()
+for dir in "${projects[@]}"; do
+  unit="$(unit_for "$dir")"
+  wanted[$unit]=1
+  systemctl --user is-enabled --quiet "$unit" || systemctl --user enable --quiet "$unit"
+  systemctl --user start --no-block "$unit"
+done
+
+# Anything else is a deleted or excluded folder, a folder that switched
+# modes, or a folder whose root was removed from the config
+while IFS= read -r unit; do
+  [ -n "${wanted[$unit]:-}" ] && continue
+  echo "stopping $unit ($(dir_for_unit "$unit"))"
+  systemctl --user disable --now --quiet "$unit"
+done < <(list_instance_units)

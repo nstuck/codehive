@@ -1,0 +1,31 @@
+# Example codehive config. install.sh writes the real one to
+# ~/.config/codehive/config from its flags; you can also copy this file there
+# (for example from another machine) and run the installer.
+
+# Folders whose subfolders are projects. `codehive new` uses the first one.
+PROJECT_DIRS=(
+  "$HOME/projects"
+  # "$HOME/work"
+)
+
+# The launcher's workspace, where you ask for new projects from any client
+LAUNCHER_DIR="$HOME/.local/share/codehive/launcher"
+
+# Where the codehive command is installed; should be on your PATH
+BIN_DIR="$HOME/.local/bin"
+
+# Permission mode for sessions (acceptEdits, auto, default, ...); empty means Claude Code's default
+PERMISSION_MODE=""
+
+# 1 lets the launcher run `codehive new` without asking
+LAUNCHER_AUTOAPPROVE=0
+
+# 1 trusts every project folder automatically, so a server starts for anything
+# that lands in a project folder. 0 (the default) only serves folders you've
+# trusted with `codehive trust`, made with `codehive new`, or opened with
+# `claude` and accepted the trust dialog for. See docs/workspace-trust.md.
+AUTO_TRUST=0
+
+# 1 checks GitHub once a day for a newer codehive release and mentions it in
+# `codehive status` and at the start of launcher sessions. 0 turns that off.
+UPDATE_CHECK=1

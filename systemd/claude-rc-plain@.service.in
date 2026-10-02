@@ -1,0 +1,14 @@
+[Unit]
+Description=Claude Code Remote Control (%f, no git)
+
+[Service]
+WorkingDirectory=%f
+Environment="PATH=@PATH@"
+Environment="CODEHIVE_CONFIG=@CODEHIVE_CONFIG@" "CODEHIVE_DATA=@CODEHIVE_DATA@"
+Environment="CLAUDE_BIN=@CLAUDE_BIN@"
+ExecStart="@LIBEXEC@/claude-rc-run" same-dir
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
