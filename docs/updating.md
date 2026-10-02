@@ -34,8 +34,8 @@ codehive checks GitHub once a day for a newer release of the repo you installed 
 
 The notice gives the command that fits your install: `codehive update`, `codehive update --ref <new tag>` if you installed a specific release, or `git pull && ./install.sh` for a clone. Nothing updates on its own.
 
-Releases are tags like `v1.2.0`, and each one lists its changes on the [releases page](https://github.com/nstuck/codehive/releases) and in [CHANGELOG.md](../CHANGELOG.md). Read them before updating, especially for a new major version, which changes how an existing install behaves.
+codehive is built nightly, whenever something changed. Each build is a release named after the UTC date it was made, with tags like `v2026.10.03`, and lists its changes on the [releases page](https://github.com/nstuck/codehive/releases) and in [CHANGELOG.md](../CHANGELOG.md). Read them before updating, especially lines that start with **Action needed:**, which change how an existing install behaves or need something from you. If you skipped several releases, read each one since your version.
 
 The check is a single request to `api.github.com`, made around midnight plus up to four hours, or at the next boot if the server was off. It sends nothing about you or your projects. If the check fails, it tries again the next day. To see its results, run `journalctl --user -u claude-rc-update-check`. To turn it off, set `UPDATE_CHECK=0` in the config, or run the installer with `--no-update-check`.
 
-An install that follows `main`, the default, can be newer than the latest release. In that case there's no notice until the next release comes out.
+An install that follows `main`, the default, reports the version of the last nightly build, even if it includes changes made since then. The next nightly build brings a notice, and `codehive update` gets you everything up to it.

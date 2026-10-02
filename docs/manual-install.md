@@ -28,7 +28,7 @@ git clone https://github.com/nstuck/codehive.git ~/codehive
 cd ~/codehive
 ```
 
-To install a specific release instead of the latest `main`, check out its tag, for example `git checkout v1.0.0`.
+To install a specific release instead of the latest `main`, check out its tag from the [releases page](https://github.com/nstuck/codehive/releases), for example `git checkout v2026.10.02`.
 
 ## 2. Check your system
 

@@ -48,7 +48,7 @@ All documentation is in [docs/](docs/README.md):
 - [Daily use](docs/usage.md), [Git and non-git projects](docs/project-modes.md), [Workspace trust](docs/workspace-trust.md), [Configuration](docs/configuration.md), [Updating](docs/updating.md), [Troubleshooting](docs/troubleshooting.md), and [Uninstalling](docs/uninstall.md)
 - [How it works](docs/how-it-works.md), [Network and data](docs/network-and-data.md), and [Security model](docs/security.md)
 
-Changes between versions are listed in [CHANGELOG.md](CHANGELOG.md). [RELEASING.md](RELEASING.md) covers versioning and releases.
+Changes between versions are listed in [CHANGELOG.md](CHANGELOG.md). [RELEASING.md](RELEASING.md) covers version numbers and nightly builds.
 
 ## License
 
