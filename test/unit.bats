@@ -71,7 +71,7 @@ import json, sys
 deny = json.load(open(sys.argv[1]))["permissions"]["deny"]
 home = sys.argv[2]
 for c in ("codehive", f"{home}/.local/bin/codehive", "~/.local/bin/codehive"):
-    for sub in ("trust", "untrust", "update", "restart", "uninstall"):
+    for sub in ("trust", "untrust", "delete", "update", "restart", "uninstall"):
         rule = f"Bash({c} {sub}:*)"
         assert rule in deny, rule
 print("ok")
@@ -153,6 +153,54 @@ PY
   [ -d "$HOME/work/two/.git" ]
   run codehive new three --in elsewhere
   [ "$status" -ne 0 ]
+}
+
+# ---------------------------------------------------------------- codehive delete
+
+@test "delete stops the server, forgets trust, and deletes the folder" {
+  install_codehive
+  codehive new doomed
+  grep -qx "$PROJECTS/doomed" "$DATA/trusted"
+  : >"$STUB_LOG"
+  run codehive delete doomed --yes
+  [ "$status" -eq 0 ]
+  [ ! -e "$PROJECTS/doomed" ]
+  [ "$(trusted "$PROJECTS/doomed")" = no ]
+  run ! grep -qx "$PROJECTS/doomed" "$DATA/trusted"
+  grep -qxF -- "--user disable --now --quiet claude-rc@$(systemd-escape --path "$PROJECTS/doomed").service" "$STUB_LOG"
+}
+
+@test "delete shows what would be lost and asks, unless --yes is given" {
+  install_codehive
+  codehive new keep
+  touch "$PROJECTS/keep/draft"
+  run codehive delete keep </dev/null
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"files with uncommitted changes: 1"* ]]
+  [[ "$output" == *"no remote"* ]]
+  [[ "$output" == *"pass --yes"* ]]
+  [ -e "$PROJECTS/keep/draft" ]
+}
+
+@test "delete only deletes a folder directly inside a project folder" {
+  install_codehive
+  mkdir -p "$HOME/outside"
+  for arg in . .. "$PROJECTS" "$HOME/outside" "$DATA/launcher" launcher /; do
+    run codehive delete "$arg" --yes
+    [ "$status" -ne 0 ] || { echo "deleted: $arg"; return 1; }
+  done
+  [ -d "$PROJECTS" ] && [ -d "$HOME/outside" ] && [ -d "$DATA/launcher" ]
+}
+
+@test "delete removes only the link for a linked project" {
+  install_codehive
+  mkdir -p "$HOME/real"
+  touch "$HOME/real/file"
+  ln -s "$HOME/real" "$PROJECTS/linked"
+  run codehive delete linked --yes
+  [ "$status" -eq 0 ]
+  [ ! -L "$PROJECTS/linked" ]
+  [ -e "$HOME/real/file" ]
 }
 
 # ---------------------------------------------------------------- trust
