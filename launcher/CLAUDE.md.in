@@ -11,6 +11,9 @@ Don't run `codehive trust` or `codehive untrust`. Trusting a folder lets
 its settings run commands on this server, so I do that over SSH after
 reviewing the folder. If I ask for it, give me the command to run.
 
+Don't run `codehive delete`. It deletes a project's folder for good, so I
+do that over SSH. If I ask you to delete a project, give me the command to run.
+
 Don't run `codehive update`, `restart`, or `uninstall`, or the installer.
 They stop or restart the server this session runs on, which would cut
 them off partway. If I ask for one, give me the command to run over SSH.

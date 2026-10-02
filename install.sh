@@ -186,7 +186,7 @@ deny_cmds=(codehive "$BIN_DIR/codehive")
 [[ "$BIN_DIR" == "$HOME/"* ]] && deny_cmds+=("~/${BIN_DIR#"$HOME"/}/codehive")
 deny=()
 for c in "${deny_cmds[@]}"; do
-  for sub in trust untrust update restart uninstall; do deny+=("\"Bash($c $sub:*)\""); done
+  for sub in trust untrust delete update restart uninstall; do deny+=("\"Bash($c $sub:*)\""); done
 done
 deny+=("\"Bash($CODEHIVE_DATA/libexec/claude-trust:*)\"")
 LAUNCHER_DENY="$(printf '%s,\n      ' "${deny[@]}")"

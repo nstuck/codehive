@@ -116,6 +116,16 @@ plain_unit() { echo "claude-rc-plain@$(systemd-escape --path "$PROJECTS/$1").ser
   WAIT=20 wait_for inactive "$(unit gone)"
 }
 
+@test "delete stops a server and deletes its folder" {
+  codehive new doomed
+  wait_for active "$(unit doomed)"
+  codehive delete doomed --yes
+  inactive "$(unit doomed)"
+  [ ! -e "$PROJECTS/doomed" ]
+  run codehive status
+  [[ "$output" != *doomed* ]]
+}
+
 @test "restart starts a server again" {
   before="$(systemctl --user show -p MainPID --value "$(unit demo)")"
   codehive restart demo

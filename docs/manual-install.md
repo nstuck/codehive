@@ -122,7 +122,7 @@ deny_cmds=(codehive "$BIN_DIR/codehive")
 [[ "$BIN_DIR" == "$HOME/"* ]] && deny_cmds+=("~/${BIN_DIR#"$HOME"/}/codehive")
 deny=()
 for c in "${deny_cmds[@]}"; do
-  for sub in trust untrust update restart uninstall; do deny+=("\"Bash($c $sub:*)\""); done
+  for sub in trust untrust delete update restart uninstall; do deny+=("\"Bash($c $sub:*)\""); done
 done
 deny+=("\"Bash($CODEHIVE_DATA/libexec/claude-trust:*)\"")
 LAUNCHER_DENY="$(printf '%s,\n      ' "${deny[@]}")"
@@ -235,7 +235,7 @@ They go in `~/.local/share/systemd/user`, the folder systemd reads for user unit
 
 ## 8. Set up the launcher
 
-The launcher's folder holds two files. `CLAUDE.md` tells the launcher's Claude how to create projects. `.claude/settings.json` holds the hook that shows update notices in launcher sessions, the deny rules that keep the launcher from running `codehive trust`, `untrust`, `update`, `restart`, and `uninstall`, plus the `codehive new` permission if you set `LAUNCHER_AUTOAPPROVE=1`.
+The launcher's folder holds two files. `CLAUDE.md` tells the launcher's Claude how to create projects. `.claude/settings.json` holds the hook that shows update notices in launcher sessions, the deny rules that keep the launcher from running `codehive trust`, `untrust`, `delete`, `update`, `restart`, and `uninstall`, plus the `codehive new` permission if you set `LAUNCHER_AUTOAPPROVE=1`.
 
 First check whether there's a settings file there that codehive didn't write:
 

@@ -35,7 +35,7 @@ The installer writes `.claude/settings.json` in the launcher folder. It holds:
 
 - A `SessionStart` hook that runs `~/.local/share/codehive/libexec/claude-rc-update-check --notice` when a launcher session starts. It reads the result of the last update check, without going online, and prints the notice if a newer version is out. That way, the launcher's Claude can tell you (see [Update notices](updating.md#update-notices)).
 - With `--launcher-autoapprove`, permission to run `codehive new` without asking: `"permissions": {"allow": ["Bash(/home/you/.local/bin/codehive new:*)"]}`.
-- Deny rules that stop the launcher from running `codehive trust`, `untrust`, `update`, `restart`, and `uninstall`, and codehive's trust script. Each command is listed as `codehive`, by its full path, and by its `~/` path, for example `"Bash(codehive trust:*)"`. Claude Code enforces deny rules even in a permission mode that skips prompts. They match the start of a command, so they're a guardrail, not a lock: a command that reaches the same thing another way, such as through `bash -c`, isn't matched.
+- Deny rules that stop the launcher from running `codehive trust`, `untrust`, `delete`, `update`, `restart`, and `uninstall`, and codehive's trust script. Each command is listed as `codehive`, by its full path, and by its `~/` path, for example `"Bash(codehive trust:*)"`. Claude Code enforces deny rules even in a permission mode that skips prompts. They match the start of a command, so they're a guardrail, not a lock: a command that reaches the same thing another way, such as through `bash -c`, isn't matched.
 
 If that file already exists and the installer didn't write it, it's left alone and the installer warns you. Add those things to it yourself if you want them.
 
