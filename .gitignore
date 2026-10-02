@@ -1,0 +1,3 @@
+# Claude Code: session worktrees and personal settings
+.claude/worktrees/
+.claude/settings.local.json

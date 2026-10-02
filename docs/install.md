@@ -76,7 +76,7 @@ curl -fsSL https://raw.githubusercontent.com/nstuck/codehive/main/install.sh | b
 ./install.sh --project-dir ~/projects --project-dir ~/work
 ```
 
-To install a specific release instead of the newest one, set `CODEHIVE_REF` to a tag from the [releases page](https://github.com/nstuck/codehive/releases). `CODEHIVE_REF=main` installs the latest commit on `main`, including changes that haven't been through a nightly build yet:
+To install a specific release instead of the newest one, set `CODEHIVE_REF` to a tag from the [releases page](https://github.com/nstuck/codehive/releases). Nightly prereleases are listed there too. `CODEHIVE_REF=main` installs the latest commit on `main`, including changes that haven't been through a nightly build yet:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nstuck/codehive/main/install.sh | CODEHIVE_REF=v2026.10.02 bash

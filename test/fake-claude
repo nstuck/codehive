@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Stands in for Claude Code in the tests, so they need no Claude account.
+# `remote-control` records how it was started and then waits like a server
+# does, so its systemd unit stays active until it's stopped.
+set -euo pipefail
+case "${1:-}" in
+  auth)
+    echo '{"loggedIn": true, "authMethod": "claude.ai"}' ;;
+  remote-control)
+    mkdir -p "$HOME/.fake-claude"
+    printf '%s\n' "$PWD" "$@" >"$HOME/.fake-claude/$(basename "$PWD").args"
+    echo "fake Remote Control server for $PWD"
+    exec sleep infinity ;;
+  --version)
+    echo "0.0.0 (fake Claude Code)" ;;
+  *)
+    echo "fake claude: unexpected arguments: $*" >&2
+    exit 1 ;;
+esac

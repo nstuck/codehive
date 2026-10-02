@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(codehive new:*)",
+      "Bash(codehive trust:*)",
+      "Bash(codehive untrust:*)",
+      "Bash(codehive delete:*)",
+      "Bash(codehive sync:*)",
+      "Bash(codehive restart:*)",
+      "Bash(codehive off:*)",
+      "Bash(codehive on:*)",
+      "Bash(codehive update:*)",
+      "Bash(codehive uninstall:*)",
+      "Bash(~/.local/bin/codehive new:*)",
+      "Bash(~/.local/bin/codehive trust:*)",
+      "Bash(~/.local/bin/codehive untrust:*)",
+      "Bash(~/.local/bin/codehive delete:*)",
+      "Bash(~/.local/bin/codehive sync:*)",
+      "Bash(~/.local/bin/codehive restart:*)",
+      "Bash(~/.local/bin/codehive off:*)",
+      "Bash(~/.local/bin/codehive on:*)",
+      "Bash(~/.local/bin/codehive update:*)",
+      "Bash(~/.local/bin/codehive uninstall:*)",
+      "Bash(./install.sh:*)",
+      "Bash(bash install.sh:*)",
+      "Bash(bash ./install.sh:*)",
+      "Bash(sh install.sh:*)",
+      "Bash(./uninstall.sh:*)",
+      "Bash(bash uninstall.sh:*)",
+      "Bash(bash ./uninstall.sh:*)",
+      "Bash(bats test/integration.bats:*)",
+      "Bash(bats ./test/integration.bats:*)",
+      "Bash(systemctl --user:*)",
+      "Bash(loginctl:*)",
+      "Bash(bats test)",
+      "Bash(bats test/)",
+      "Bash(bats ./test)",
+      "Bash(bats ./test/)"
+    ]
+  }
+}

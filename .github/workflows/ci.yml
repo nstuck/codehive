@@ -1,0 +1,154 @@
+# Check every change: lint the scripts, run the tests that need nothing but a
+# sandbox, then install codehive for real and run the integration tests
+# against a systemd user manager, on Ubuntu 24.04 and on Debian 13 booted in a
+# container, each on x86_64 and ARM64. Claude Code is replaced by
+# test/fake-claude, so no Claude account is needed; a separate job checks that
+# the real Claude Code still accepts what codehive passes it. The nightly build
+# runs this too and only publishes a build that passes.
+name: CI
+
+on:
+  # Every branch pushed here; pull requests only from forks, since a branch in
+  # this repo is already checked on push
+  push:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install shellcheck
+        run: command -v shellcheck || { sudo apt-get update -q && sudo apt-get install -yq shellcheck; }
+
+      - name: Check the shell scripts
+        run: |
+          shellcheck -x -s bash install.sh uninstall.sh bin/codehive.in lib/common.sh \
+            libexec/claude-rc-sync libexec/claude-rc-run libexec/claude-rc-update-check \
+            test/fake-claude test/helpers.bash test/unit.bats test/integration.bats
+          for f in install.sh uninstall.sh bin/codehive.in lib/common.sh libexec/claude-rc-*; do
+            head -1 "$f" | grep -q python || bash -n "$f"
+          done
+
+      - name: Check the Python scripts
+        run: |
+          python3 -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' \
+            libexec/claude-trust libexec/claude-rc-logfilter
+
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    # Pinned, not ubuntu-latest: docs/requirements.md names these versions
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install bats
+        run: sudo apt-get update -q && sudo apt-get install -yq bats dbus-user-session
+
+      - name: Run the sandboxed tests
+        run: bats test/unit.bats
+
+      - name: Start a systemd user manager
+        run: |
+          sudo loginctl enable-linger "$USER"
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >>"$GITHUB_ENV"
+          for _ in $(seq 30); do
+            XDG_RUNTIME_DIR="/run/user/$(id -u)" systemctl --user show-environment >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          echo "the systemd user manager didn't start" >&2
+          exit 1
+
+      - name: Run the integration tests
+        run: bats test/integration.bats
+
+      - name: Show the services and their logs
+        if: failure()
+        run: |
+          systemctl --user list-units --all --no-pager 'claude-rc*' || true
+          journalctl --user --no-pager -n 300 || true
+
+  debian13:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    env:
+      AS_TESTER: >-
+        docker exec -u tester -w /home/tester/codehive -e HOME=/home/tester -e USER=tester
+        -e XDG_RUNTIME_DIR=/run/user/1000 -e GITHUB_ACTIONS=true debian
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Boot Debian 13 with systemd
+        run: |
+          docker build -q -t codehive-debian13 -f test/debian13.Dockerfile test
+          docker run -d --name debian --privileged --cgroupns=private \
+            --tmpfs /run --tmpfs /run/lock --tmpfs /tmp:rw,exec,size=1g codehive-debian13
+          # shellcheck disable=SC2016  # expanded inside the container
+          timeout 60 docker exec debian sh -c \
+            'until [ "$(systemctl is-system-running)" = running ] || [ "$(systemctl is-system-running)" = degraded ]; do sleep 1; done'
+          docker cp . debian:/home/tester/codehive
+          docker exec debian chown -R tester: /home/tester/codehive
+          docker exec debian loginctl enable-linger tester
+          # shellcheck disable=SC2016  # expanded by the inner sh, which has AS_TESTER
+          timeout 60 sh -c 'until $AS_TESTER systemctl --user show-environment >/dev/null 2>&1; do sleep 1; done'
+
+      - name: Run the sandboxed tests
+        run: $AS_TESTER bats test/unit.bats
+
+      - name: Run the integration tests
+        run: $AS_TESTER bats test/integration.bats
+
+      - name: Show the services and their logs
+        if: failure()
+        run: |
+          docker exec debian systemctl --no-pager --failed || true
+          $AS_TESTER systemctl --user list-units --all --no-pager 'claude-rc*' || true
+          docker exec debian journalctl --no-pager -n 300 || true
+
+  # The tests use a fake Claude Code, which can't notice when the real one
+  # changes. This installs the real one, not signed in, and checks the parts
+  # codehive relies on.
+  claude-code:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install Claude Code
+        run: curl -fsSL https://claude.ai/install.sh | bash
+
+      # Signed out, `claude remote-control` refuses before it reads its options,
+      # even --help, so this looks for their help text in the binary instead.
+      # That catches an option that was renamed or removed, not one whose
+      # meaning changed. --name and --permission-mode also appear in other
+      # commands' help, so --spawn is the strongest check.
+      - name: Check what codehive passes to Remote Control
+        run: |
+          claude="$(readlink -f "$HOME/.local/bin/claude")"
+          "$claude" --version
+          missing=0
+          # claude-rc-run passes --name, --spawn same-dir or worktree, and --permission-mode
+          for want in "--name <name>" "--spawn <mode>" "Spawn mode: same-dir, worktree" "--permission-mode <mode>"; do
+            grep -qaF -- "$want" "$claude" || { echo "::error::Claude Code no longer mentions: $want"; missing=1; }
+          done
+          exit "$missing"
+
+      - name: Check the sign-in status the installer reads
+        run: |
+          # install.sh looks for "authMethod": "claude.ai" in this JSON
+          out="$("$HOME/.local/bin/claude" auth status 2>&1)" || true
+          printf '%s\n' "$out"
+          python3 -c 'import json, sys; d = json.loads(sys.argv[1]); assert "loggedIn" in d, "no loggedIn key"' "$out"
