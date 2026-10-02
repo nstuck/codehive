@@ -1,0 +1,90 @@
+# Build codehive every night. If anything the installer installs has changed
+# since the last build, stamp a date version (2026.10.03, or 2026.10.03.1 for a
+# second build that day) into VERSION, move CHANGELOG.md's Unreleased entries
+# under it, commit and tag that on main, and publish a GitHub release.
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Look for changes since the last build
+        id: changes
+        run: |
+          last="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
+          if [ -n "$last" ] && git diff --quiet "$last" HEAD -- \
+              install.sh uninstall.sh bin lib libexec launcher systemd; then
+            echo "Nothing the installer installs has changed since $last, so there's no build tonight"
+            echo "build=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "build=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Pick the version
+        if: steps.changes.outputs.build == 'true'
+        run: |
+          date="$(date -u +%Y.%m.%d)"
+          version="$date" n=0
+          while git rev-parse -q --verify "refs/tags/v$version" >/dev/null; do
+            n=$((n + 1)) version="$date.$n"
+          done
+          echo "VERSION=$version" >>"$GITHUB_ENV"
+          echo "Building codehive $version"
+
+      - name: Stamp VERSION and CHANGELOG.md
+        if: steps.changes.outputs.build == 'true'
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          printf '%s\n' "$VERSION" >VERSION
+          python3 - <<'PY'
+          import datetime, os, re
+          version, url = os.environ["VERSION"], os.environ["REPO_URL"]
+          today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+          text = open("CHANGELOG.md").read()
+          head, sep, rest = text.partition("## [Unreleased]\n")
+          if not sep:
+              raise SystemExit("CHANGELOG.md has no ## [Unreleased] heading")
+          # Unreleased runs until the next version heading or the link list
+          m = re.search(r"^(## \[|\[[^]]+\]: )", rest, re.M)
+          entries, tail = (rest[:m.start()], rest[m.start():]) if m else (rest, "")
+          entries = entries.strip() or "No notable changes."
+          text = f"{head}## [Unreleased]\n\n## [{version}] - {today}\n\n{entries}\n\n{tail}"
+          text = re.sub(r"^\[Unreleased\]: .*$",
+                        f"[Unreleased]: {url}/compare/v{version}...HEAD\n"
+                        f"[{version}]: {url}/releases/tag/v{version}",
+                        text, count=1, flags=re.M)
+          open("CHANGELOG.md", "w").write(text)
+          open("notes.md", "w").write(entries + "\n")
+          PY
+
+      - name: Commit and tag on main
+        if: steps.changes.outputs.build == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "codehive $VERSION" -- VERSION CHANGELOG.md
+          git tag "v$VERSION"
+          git push --atomic origin HEAD:main "refs/tags/v$VERSION"
+
+      - name: Publish the release
+        if: steps.changes.outputs.build == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v$VERSION" --verify-tag --title "codehive $VERSION" --notes-file notes.md

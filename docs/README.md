@@ -25,5 +25,5 @@
 
 **Contributing**
 
-- [Releasing](../RELEASING.md): versioning and cutting a release
+- [Releasing](../RELEASING.md): version numbers and nightly builds
 - [Changelog](../CHANGELOG.md)

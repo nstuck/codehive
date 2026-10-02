@@ -1,30 +1,34 @@
-# Releasing codehive
+# Releasing
 
-Every change to what codehive installs gets its own version number, so a version always names one exact build. Releases are git tags like `v1.2.3` on some of those versions. Pushing a tag publishes a GitHub release, with that version's section of [CHANGELOG.md](CHANGELOG.md) as the notes. Installs see the new release within a day.
+codehive is built every night. Nobody cuts releases by hand.
 
-Version numbers between releases are never tagged, so release numbers can skip: after `1.0.0`, the next release might be `1.0.3`.
+## Version numbers
+
+Versions are calendar versions in the form `YYYY.0M.0D`: the UTC date of the build, with zero-padded month and day, such as `2026.10.03`. In the rare case that a second build runs on the same day, it gets a counter: `2026.10.03.1`, `2026.10.03.2`. Each build is tagged `v` plus the version, for example `v2026.10.03`.
+
+A version says when a build was made. It doesn't say how big the change was. Changes that need something from the user are marked in the changelog instead (see below).
+
+## The nightly build
+
+The [Nightly workflow](.github/workflows/nightly.yml) runs at 03:00 UTC. It looks at what changed on `main` since the last tag. If nothing the installer installs has changed (`install.sh`, `uninstall.sh`, and everything under `bin/`, `lib/`, `libexec/`, `launcher/`, and `systemd/`), it stops, so days with only docs changes don't get a build. Otherwise it:
+
+1. Writes the new version to `VERSION`.
+2. Moves everything under **Unreleased** in `CHANGELOG.md` into a new section for that version, and updates the links at the bottom.
+3. Commits both files to `main` as `codehive <version>`, tags that commit, and pushes both together.
+4. Publishes a GitHub release with that version's changelog section as the notes.
+
+Installs see the new release within a day.
+
+To build right away, for example to ship a fix, run the workflow by hand from the Actions tab or with `gh workflow run nightly.yml`. If the build fails, fix the problem on `main` and run it again. Nothing is tagged or published until the push succeeds, so a failed run leaves nothing to clean up.
+
+The workflow pushes to `main` with the built-in `GITHUB_TOKEN`. If `main` is protected, allow GitHub Actions to push to it.
 
 ## While working
 
 In the same pull request as the change:
 
-1. **Bump `VERSION`** if the change touches anything the installer installs or runs: `install.sh`, `uninstall.sh`, and everything under `bin/`, `lib/`, `libexec/`, `launcher/`, and `systemd/`. Count from the current `VERSION`, not the last release. Bump the major version if an existing install behaves differently or needs something from the user after updating, the minor version if something was added, and the patch version for fixes only. Changes to docs, the changelog, or the release workflow don't get a new version.
+1. **Leave `VERSION` alone.** Only the nightly build changes it.
 2. **Update [docs/manual-install.md](docs/manual-install.md)** if the change touches `install.sh` or what it installs. That page has to list exactly what the installer does.
-3. **Add a line under Unreleased** in `CHANGELOG.md`, under **Added**, **Changed**, **Fixed**, or **Removed**. Write it for someone running codehive, not for someone reading the code: what's different for them, and anything they need to do.
+3. **Add a line under Unreleased** in `CHANGELOG.md`, under **Added**, **Changed**, **Fixed**, or **Removed**. Write it for someone running codehive, not for someone reading the code: what's different for them, and anything they need to do. If an existing install behaves differently after updating, or needs something from the user, start the line with **Action needed:**.
 
-An install that follows `main` reports the bumped version in `codehive version`. It gets no update notice until a release with a higher number comes out.
-
-## Cutting a release
-
-A release publishes whatever version `main` is at. `VERSION` is already right, so nothing gets bumped.
-
-1. In `CHANGELOG.md`, rename **Unreleased** to `[1.2.3] - YYYY-MM-DD`, using the version in `VERSION`, add a new empty **Unreleased** above it, and update the links at the bottom.
-2. Merge that to `main`, then tag the merge and push the tag:
-
-   ```bash
-   git checkout main && git pull
-   git tag "v$(cat VERSION)"
-   git push origin "v$(cat VERSION)"
-   ```
-
-The [Release workflow](.github/workflows/release.yml) checks that the tag matches `VERSION` and that the changelog has a section for it, then publishes the release. If it fails, fix the problem on `main`, delete the tag (`git push origin :v1.2.3 && git tag -d v1.2.3`), and tag again.
+An install that follows `main` reports the version of the last nightly build in `codehive version`, even if it has changes from after that build.

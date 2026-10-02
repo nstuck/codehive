@@ -73,10 +73,10 @@ curl -fsSL https://raw.githubusercontent.com/nstuck/codehive/main/install.sh | b
 ./install.sh --project-dir ~/projects --project-dir ~/work
 ```
 
-To install a specific release instead of the latest `main`, set `CODEHIVE_REF` to a tag or branch:
+To install a specific release instead of the latest `main`, set `CODEHIVE_REF` to a tag from the [releases page](https://github.com/nstuck/codehive/releases) or a branch:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nstuck/codehive/main/install.sh | CODEHIVE_REF=v1.0.0 bash
+curl -fsSL https://raw.githubusercontent.com/nstuck/codehive/main/install.sh | CODEHIVE_REF=v2026.10.02 bash
 ```
 
 `CODEHIVE_REPO` installs from a fork (default `nstuck/codehive`).
