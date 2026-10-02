@@ -12,6 +12,7 @@ PERMISSION_MODE=""
 LAUNCHER_AUTOAPPROVE=0
 AUTO_TRUST=0
 UPDATE_CHECK=1
+HARDEN=0
 
 # shellcheck source=/dev/null
 [ -r "$CODEHIVE_CONFIG" ] && . "$CODEHIVE_CONFIG"
@@ -90,7 +91,7 @@ version_gt() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | 
 
 # Print the command that updates this install to version $1
 update_command() {
-  local CODEHIVE_REPO="" CODEHIVE_REF=main CODEHIVE_CHECKOUT=""
+  local CODEHIVE_REPO="" CODEHIVE_REF=latest CODEHIVE_CHECKOUT=""
   # shellcheck source=/dev/null
   [ -r "$CODEHIVE_DATA/source" ] && . "$CODEHIVE_DATA/source"
   if [ -n "$CODEHIVE_CHECKOUT" ]; then
@@ -111,6 +112,30 @@ update_notice() {
   [ "$installed" = unknown ] || version_gt "$latest" "$installed" || return 0
   echo "codehive $latest is available (installed: $installed). Release notes: $url"
   echo "To update, run this over SSH, not from a Claude session: $(update_command "$latest")"
+}
+
+# Succeed if `codehive off` has turned every server off
+is_off() { [ -e "$CODEHIVE_DATA/off" ]; }
+
+# Print one line for each setting, or fact about this user, that lets sessions
+# do more without asking. Shown by `codehive status`; see docs/security.md.
+security_notes() {
+  local g
+  case "$PERMISSION_MODE" in
+    bypassPermissions) echo "PERMISSION_MODE=bypassPermissions: sessions run commands and edit files without asking" ;;
+    auto)              echo "PERMISSION_MODE=auto: a classifier approves most actions without asking you" ;;
+    acceptEdits)       echo "PERMISSION_MODE=acceptEdits: sessions edit files without asking" ;;
+  esac
+  [ "$AUTO_TRUST" = 1 ] && echo "AUTO_TRUST=1: anything that can write to a project folder can get commands run as you"
+  [ "$LAUNCHER_AUTOAPPROVE" = 1 ] && echo "LAUNCHER_AUTOAPPROVE=1: the launcher creates projects and starts their servers without asking"
+  # With HARDEN=1, sessions can't use sudo at all
+  if [ "$HARDEN" != 1 ] && command -v sudo >/dev/null && sudo -n -l 2>/dev/null | grep -q NOPASSWD; then
+    echo "you can use sudo without a password, so a session can get root (HARDEN=1 blocks sudo in sessions)"
+  fi
+  for g in docker lxd incus; do
+    id -nG | tr ' ' '\n' | grep -qx "$g" && echo "you're in the $g group, so a session can get root through it"
+  done
+  return 0
 }
 
 die()  { echo "codehive: $*" >&2; exit 1; }

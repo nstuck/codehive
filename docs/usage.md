@@ -17,9 +17,13 @@
 | Stop trusting a folder | `codehive untrust <path>...`. Its server stops. |
 | See the installed version | `codehive version`. This also checks for a newer one. |
 | Update codehive | `codehive update` (see [Updating](updating.md)) |
+| Turn every server off | `codehive off`. Every server stops, including the launcher, and none start again, even after a reboot, until `codehive on`. You can also ask the launcher to do it. |
+| Turn the servers back on | `codehive on`, over SSH |
 | Uninstall | `codehive uninstall` (see [Uninstall](uninstall.md)) |
 | Show the commands | `codehive help` |
 
 `<name>` is a project's folder name, a path (when two project folders have a project with the same name), or `launcher`.
 
-Run `codehive restart`, `update`, and `uninstall` from SSH or a console, not from a Claude session (see [Updating](updating.md)).
+`codehive status` ends with security notes when a setting or your user account lets sessions do more without asking, such as `AUTO_TRUST=1` or passwordless `sudo`. See the [Security model](security.md).
+
+Run `codehive restart`, `update`, `uninstall`, and `on` from SSH or a console, not from a Claude session (see [Updating](updating.md)).

@@ -8,13 +8,22 @@ set -euo pipefail
 # after it is needed from the pipe.
 if [ ! -f "$(dirname "${BASH_SOURCE[0]:-/nonexistent/x}")/systemd/claude-rc@.service.in" ]; then
   CODEHIVE_REPO="${CODEHIVE_REPO:-nstuck/codehive}"
-  CODEHIVE_REF="${CODEHIVE_REF:-main}"
+  CODEHIVE_REF="${CODEHIVE_REF:-latest}"
   # The installer records these so `codehive update` installs from the same place
   export CODEHIVE_REPO CODEHIVE_REF CODEHIVE_DOWNLOADED=1
+  # "latest" means the newest release. `codehive update` passes the tag it
+  # already looked up in CODEHIVE_TAG.
+  ref="$CODEHIVE_REF"
+  if [ "$ref" = latest ]; then
+    ref="${CODEHIVE_TAG:-}"
+    [ -n "$ref" ] || ref="$(curl -fsSL "https://api.github.com/repos/$CODEHIVE_REPO/releases/latest" \
+      | sed -n 's/^ *"tag_name": *"\([^"]*\)".*/\1/p')" || ref=""
+    [ -n "$ref" ] || { echo "No release found for $CODEHIVE_REPO; installing main instead."; ref=main; }
+  fi
   CODEHIVE_TMP="$(mktemp -d)"
   trap 'rm -rf "$CODEHIVE_TMP"' EXIT
-  echo "Downloading codehive ($CODEHIVE_REPO@$CODEHIVE_REF)..."
-  url="https://github.com/$CODEHIVE_REPO/archive/$CODEHIVE_REF.tar.gz"
+  echo "Downloading codehive ($CODEHIVE_REPO@$ref)..."
+  url="https://github.com/$CODEHIVE_REPO/archive/$ref.tar.gz"
   curl -fsSL -o "$CODEHIVE_TMP/src.tar.gz" "$url" \
     || { echo "codehive: couldn't download $url (check CODEHIVE_REPO and CODEHIVE_REF)" >&2; exit 1; }
   tar -xzf "$CODEHIVE_TMP/src.tar.gz" -C "$CODEHIVE_TMP" --strip-components=1
@@ -51,11 +60,15 @@ usage: ./install.sh [options]
   --no-auto-trust            only serve folders you've trusted (default)
   --no-update-check          don't check GitHub for new codehive releases
   --update-check             check GitHub once a day for new releases (default)
+  --harden                   stop sessions from gaining privileges, such as through sudo
+                             (see docs/security.md)
+  --no-harden                let sessions use sudo and setuid programs (default)
   -y, --yes                  don't ask for confirmation
   -h, --help                 show this help
 
 Settings are saved to $CODEHIVE_CONFIG and reused on the next run.
-Through curl, CODEHIVE_REF picks the branch or tag to install (default: main)
+Through curl, CODEHIVE_REF picks the tag or branch to install (default: latest,
+the newest release)
 and CODEHIVE_REPO the GitHub repo (default: nstuck/codehive).
 EOF
 }
@@ -74,6 +87,8 @@ while [ $# -gt 0 ]; do
     --no-auto-trust)          AUTO_TRUST=0; shift ;;
     --update-check)           UPDATE_CHECK=1; shift ;;
     --no-update-check)        UPDATE_CHECK=0; shift ;;
+    --harden)                 HARDEN=1; shift ;;
+    --no-harden)              HARDEN=0; shift ;;
     -y|--yes)                 ASSUME_YES=1; shift ;;
     -h|--help)                usage; exit 0 ;;
     *)                        usage >&2; exit 1 ;;
@@ -165,6 +180,22 @@ units_changed=0
 LAUNCHER_ALLOW=""
 [ "$LAUNCHER_AUTOAPPROVE" = 1 ] && LAUNCHER_ALLOW="\"Bash($BIN_DIR/codehive new:*)\""
 
+# Commands the launcher must leave to you over SSH, in each way it might write them
+deny_cmds=(codehive "$BIN_DIR/codehive")
+[[ "$BIN_DIR" == "$HOME/"* ]] && deny_cmds+=("~/${BIN_DIR#"$HOME"/}/codehive")
+deny=()
+for c in "${deny_cmds[@]}"; do
+  for sub in trust untrust update restart uninstall; do deny+=("\"Bash($c $sub:*)\""); done
+done
+deny+=("\"Bash($CODEHIVE_DATA/libexec/claude-trust:*)\"")
+LAUNCHER_DENY="$(printf '%s,\n      ' "${deny[@]}")"
+LAUNCHER_DENY="${LAUNCHER_DENY%,*}"
+
+# Settings for the server units: sessions can't gain privileges, so sudo,
+# su, and other setuid programs don't work in them
+HARDEN_LINES=""
+[ "$HARDEN" = 1 ] && HARDEN_LINES=$'NoNewPrivileges=yes\nRestrictSUIDSGID=yes'
+
 # Replace @KEY@ placeholders. Values are inserted literally.
 render() {
   local src="$1" content
@@ -177,6 +208,8 @@ render() {
   content="${content//@CODEHIVE_CONFIG@/"$CODEHIVE_CONFIG"}"
   content="${content//@CODEHIVE_DATA@/"$CODEHIVE_DATA"}"
   content="${content//@LAUNCHER_ALLOW@/"$LAUNCHER_ALLOW"}"
+  content="${content//@LAUNCHER_DENY@/"$LAUNCHER_DENY"}"
+  content="${content//@HARDEN@/"$HARDEN_LINES"}"
   content="${content//@PROJECT_DIRS_LIST@/"$(printf -- '- %s\n' "${PROJECT_DIRS[@]}")"}"
   printf '%s\n' "$content"
 }
@@ -277,6 +310,10 @@ mkdir -p "$(dirname "$CODEHIVE_CONFIG")"
   echo "# 1 checks GitHub once a day for a newer codehive release and mentions it in"
   echo "# \`codehive status\` and at the start of launcher sessions"
   echo "UPDATE_CHECK=$UPDATE_CHECK"
+  echo
+  echo "# 1 stops sessions from gaining privileges: sudo, su, and other setuid programs"
+  echo "# don't work in them. Needs \`codehive restart\`. See docs/security.md."
+  echo "HARDEN=$HARDEN"
 } >"$CODEHIVE_CONFIG"
 
 # ---------------------------------------------------------------- start
@@ -291,19 +328,25 @@ fi
   || warn "couldn't trust $LAUNCHER_DIR; run \`claude\` there once and accept the dialog"
 
 systemctl --user daemon-reload
-systemctl --user enable --now --quiet claude-rc-launcher.service claude-rc-sync.timer claude-rc-update-check.timer
+systemctl --user enable --now --quiet claude-rc-update-check.timer
 
-wanted_watches=()
-for root in "${PROJECT_DIRS[@]}"; do
-  unit="claude-rc-watch@$(systemd-escape --path "$root").path"
-  wanted_watches+=("$unit")
-  systemctl --user enable --now --quiet "$unit"
-done
-list_instances 'claude-rc-watch@*' | while IFS= read -r unit; do
-  [[ " ${wanted_watches[*]} " == *" $unit "* ]] || systemctl --user disable --now --quiet "$unit"
-done
+if is_off; then
+  echo "codehive is off, so no servers were started. Run \`codehive on\` to start them."
+else
+  systemctl --user enable --now --quiet claude-rc-launcher.service claude-rc-sync.timer
 
-systemctl --user start claude-rc-sync.service
+  wanted_watches=()
+  for root in "${PROJECT_DIRS[@]}"; do
+    unit="claude-rc-watch@$(systemd-escape --path "$root").path"
+    wanted_watches+=("$unit")
+    systemctl --user enable --now --quiet "$unit"
+  done
+  list_instances 'claude-rc-watch@*' | while IFS= read -r unit; do
+    [[ " ${wanted_watches[*]} " == *" $unit "* ]] || systemctl --user disable --now --quiet "$unit"
+  done
+
+  systemctl --user start claude-rc-sync.service
+fi
 # A notice from before this install may be out of date; check again in the background
 rm -f "$CODEHIVE_DATA/update-available"
 systemctl --user start --no-block claude-rc-update-check.service

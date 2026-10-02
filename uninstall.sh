@@ -28,7 +28,7 @@ if [ -r "$MANIFEST" ]; then
   while IFS= read -r f; do
     rm -f "$f"
   done <"$MANIFEST"
-  rm -f "$MANIFEST" "$CODEHIVE_DATA/update-available"
+  rm -f "$MANIFEST" "$CODEHIVE_DATA/update-available" "$CODEHIVE_DATA/off"
   for d in "$LAUNCHER_DIR/.claude" "$LAUNCHER_DIR" "$CODEHIVE_DATA/libexec" "$CODEHIVE_DATA/lib" "$CODEHIVE_DATA"; do
     rmdir "$d" 2>/dev/null || true
   done

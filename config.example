@@ -29,3 +29,7 @@ AUTO_TRUST=0
 # 1 checks GitHub once a day for a newer codehive release and mentions it in
 # `codehive status` and at the start of launcher sessions. 0 turns that off.
 UPDATE_CHECK=1
+
+# 1 stops sessions from gaining privileges: sudo, su, and other setuid programs
+# don't work in them. Needs `codehive restart`. See docs/security.md.
+HARDEN=0

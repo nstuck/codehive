@@ -36,7 +36,7 @@ To change the setting, edit `AUTO_TRUST` in the config, or run the installer aga
 
 Turn it on only if every way into your project folders is something you control and you review code before it gets there. A folder you can't vouch for belongs somewhere outside the project folders until you've read it, especially its `.claude/` folder, `.mcp.json`, and `CLAUDE.md`.
 
-With `AUTO_TRUST=0`, the trust step is a review point, not a sandbox. A trusted project's hooks still run as you, and any Claude session can edit `~/.claude.json` or run `codehive trust` itself, subject to the permission mode. For stronger separation, see the hardening options in the [security model](security.md#optional-hardening).
+With `AUTO_TRUST=0`, the trust step is a review point, not a sandbox. A trusted project's hooks still run as you, and a session in any project can edit `~/.claude.json` or run `codehive trust` itself, subject to the permission mode. Only the launcher's settings block `codehive trust`. For stronger separation, see the hardening options in the [security model](security.md#optional-hardening).
 
 **Keeping trust in place.** A Claude Code process can drop entries when it rewrites `~/.claude.json`. codehive keeps its own list of trusted folders in `~/.local/share/codehive/trusted`, and every sync puts back any entry missing from `~/.claude.json`. Folders you trusted through Claude Code's dialog are added to that list the first time a sync sees them. Folders marked with `.no-rc` are never trusted by the sync.
 

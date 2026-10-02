@@ -1,6 +1,9 @@
 {
   "permissions": {
-    "allow": [@LAUNCHER_ALLOW@]
+    "allow": [@LAUNCHER_ALLOW@],
+    "deny": [
+      @LAUNCHER_DENY@
+    ]
   },
   "hooks": {
     "SessionStart": [

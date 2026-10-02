@@ -20,10 +20,13 @@ usage: codehive <command> [args]
                             dialog, and start their servers
   untrust <path>...         stop trusting folders and stop their servers
   dirs                      list the configured project folders
+  off                       stop every server, including the launcher, until \`codehive on\`
+  on                        start the servers again after \`codehive off\`
   version                   show the installed version and check for a newer one
   update [--ref <ref>] [--repo <owner/name>] [installer options]
-                            reinstall from the repo and branch codehive came from;
-                            running servers keep going until \`codehive restart\`
+                            install the newest release (or the tag or branch you
+                            installed from), after showing what changed; running
+                            servers keep going until \`codehive restart\`
   uninstall [--purge]       remove codehive (project folders are never touched)
 
 <project> is a folder name, a path, or "launcher".
@@ -31,7 +34,13 @@ Config: $CODEHIVE_CONFIG
 EOF
 }
 
-sync_now() { systemctl --user start claude-rc-sync.service; }
+sync_now() {
+  if is_off; then
+    warn "codehive is off, so no servers start until \`codehive on\`"
+    return
+  fi
+  systemctl --user start claude-rc-sync.service
+}
 
 # Print the unit for a project given by name, path, or "launcher"
 resolve_unit() {
@@ -102,6 +111,10 @@ state_of() {
 
 cmd_status() {
   local root dir unit mode trust
+  if is_off; then
+    echo "codehive is off. Every server is stopped until you run \`codehive on\`."
+    echo
+  fi
   printf '%-28s %s\n' "launcher" "$(state_of claude-rc-launcher.service)"
   printf '%-28s %s\n' "sync timer" "$(state_of claude-rc-sync.timer)"
   for root in "${PROJECT_DIRS[@]}"; do
@@ -125,7 +138,12 @@ cmd_status() {
       printf '  %-26s %-10s %s%s\n' "$(basename "$dir")" "$(state_of "$unit")" "$mode" "$trust"
     done
   done
-  local notice
+  local notes notice
+  notes="$(security_notes)"
+  if [ -n "$notes" ]; then
+    printf '\nSecurity notes (see "Security model" in the docs):\n'
+    printf '%s\n' "$notes" | sed 's/^/  - /'
+  fi
   notice="$(update_notice)"
   [ -z "$notice" ] || printf '\n%s\n' "$notice"
 }
@@ -143,6 +161,7 @@ cmd_version() {
 }
 
 cmd_restart() {
+  is_off && die "codehive is off; run \`codehive on\` instead"
   if [ $# -eq 0 ]; then
     systemctl --user restart claude-rc-launcher.service
     list_instance_units | while IFS= read -r unit; do
@@ -157,31 +176,116 @@ cmd_restart() {
   fi
 }
 
+# Print the newest release's tag on the first line, then the notes of every
+# release newer than the installed version, oldest first. Prints nothing if
+# the repo has no releases. usage: release_notes <owner/name>
+release_notes() {
+  local body code
+  body="$(mktemp)"
+  code="$(curl -sSL --max-time 30 -o "$body" -w '%{http_code}' \
+    -H 'Accept: application/vnd.github+json' \
+    "https://api.github.com/repos/$1/releases?per_page=100")" || code=""
+  if [ "$code" != 200 ]; then
+    rm -f "$body"
+    [ "$code" = 404 ] && return 0
+    die "couldn't get the releases of $1 from GitHub (HTTP ${code:-error})"
+  fi
+  python3 - "$body" "$(installed_version)" <<'PY' || { rm -f "$body"; die "unexpected reply from GitHub"; }
+import json, re, sys
+def key(v): return [int(n) for n in re.findall(r"\d+", v)]
+releases = [r for r in json.load(open(sys.argv[1])) if not r["draft"] and not r["prerelease"]]
+releases.sort(key=lambda r: key(r["tag_name"]))
+installed = sys.argv[2]
+if releases:
+    print(releases[-1]["tag_name"])
+for r in releases:
+    if installed == "unknown" or key(r["tag_name"]) > key(installed):
+        print(f"\n=== {r['name'] or r['tag_name']} ===\n{(r['body'] or '').strip()}\n{r['html_url']}")
+PY
+  rm -f "$body"
+}
+
 # Download the installer from where this install came from and run it
 cmd_update() {
-  local CODEHIVE_REPO=nstuck/codehive CODEHIVE_REF=main CODEHIVE_CHECKOUT="" args=() tmp status=0
+  local CODEHIVE_REPO=nstuck/codehive CODEHIVE_REF=latest CODEHIVE_CHECKOUT="" args=() tmp status=0
+  local ref tag="" notes yes=0 reply
   # shellcheck source=/dev/null
   [ -r "$CODEHIVE_DATA/source" ] && . "$CODEHIVE_DATA/source"
   while [ $# -gt 0 ]; do
     case "$1" in
-      --ref)  CODEHIVE_REF="${2:?--ref needs a branch or tag}"; CODEHIVE_CHECKOUT=""; shift 2 ;;
-      --repo) CODEHIVE_REPO="${2:?--repo needs owner/name}"; CODEHIVE_CHECKOUT=""; shift 2 ;;
-      *)      args+=("$1"); shift ;;
+      --ref)    CODEHIVE_REF="${2:?--ref needs a tag, a branch, or latest}"; CODEHIVE_CHECKOUT=""; shift 2 ;;
+      --repo)   CODEHIVE_REPO="${2:?--repo needs owner/name}"; CODEHIVE_CHECKOUT=""; shift 2 ;;
+      -y|--yes) yes=1; args+=("$1"); shift ;;
+      *)        args+=("$1"); shift ;;
     esac
   done
   [ -z "$CODEHIVE_CHECKOUT" ] || die "installed from the checkout at $CODEHIVE_CHECKOUT;" \
-    "run \`git pull && ./install.sh\` there, or \`codehive update --ref main\` to install from GitHub"
+    "run \`git pull && ./install.sh\` there, or \`codehive update --ref latest\` to install from GitHub"
 
-  echo "Updating codehive from $CODEHIVE_REPO@$CODEHIVE_REF..."
-  tmp="$(mktemp)"
-  if ! curl -fsSL -o "$tmp" "https://raw.githubusercontent.com/$CODEHIVE_REPO/$CODEHIVE_REF/install.sh"; then
-    rm -f "$tmp"
-    die "couldn't download the installer for $CODEHIVE_REPO@$CODEHIVE_REF"
+  # Following releases: show what changed since the installed version, and ask
+  ref="$CODEHIVE_REF"
+  if [ "$ref" = latest ]; then
+    notes="$(release_notes "$CODEHIVE_REPO")"
+    tag="${notes%%$'\n'*}"
+    notes="${notes#"$tag"}"
+    notes="${notes#$'\n'}"
+    if [ -z "$tag" ]; then
+      echo "$CODEHIVE_REPO has no releases yet; installing main instead."
+      ref=main
+    elif [ -z "$notes" ]; then
+      echo "codehive $(installed_version) is the newest release; reinstalling it."
+      ref="$tag"
+    else
+      echo "codehive $(installed_version) is installed. What's changed since:"
+      printf '%s\n\n' "$notes"
+      ref="$tag"
+      if [ "$yes" = 0 ]; then
+        [ -t 0 ] || die "pass --yes to install $tag without being asked"
+        read -r -p "Install $tag? [Y/n] " reply
+        [[ -z "$reply" || "$reply" =~ ^[Yy] ]] || { echo "Not updating."; return 0; }
+      fi
+    fi
   fi
-  CODEHIVE_REPO="$CODEHIVE_REPO" CODEHIVE_REF="$CODEHIVE_REF" \
+
+  echo "Updating codehive from $CODEHIVE_REPO@$ref..."
+  tmp="$(mktemp)"
+  if ! curl -fsSL -o "$tmp" "https://raw.githubusercontent.com/$CODEHIVE_REPO/$ref/install.sh"; then
+    rm -f "$tmp"
+    die "couldn't download the installer for $CODEHIVE_REPO@$ref"
+  fi
+  CODEHIVE_REPO="$CODEHIVE_REPO" CODEHIVE_REF="$CODEHIVE_REF" CODEHIVE_TAG="$tag" \
     bash "$tmp" ${args[@]+"${args[@]}"} || status=$?
   rm -f "$tmp"
   return "$status"
+}
+
+# Stop every server and keep them stopped, even across reboots, until `codehive on`
+cmd_off() {
+  local units=() unit root
+  touch "$CODEHIVE_DATA/off"
+  # Nothing may start a server again: not the timer, the watches, or boot
+  systemctl --user disable --now --quiet claude-rc-sync.timer
+  while IFS= read -r unit; do
+    systemctl --user disable --now --quiet "$unit"
+  done < <(list_instances 'claude-rc-watch@*')
+  mapfile -t units < <(list_instance_units)
+  systemctl --user disable --quiet claude-rc-launcher.service ${units[@]+"${units[@]}"}
+  echo "codehive is off. Every server is stopping, and none start again, even after a reboot,"
+  echo "until you run \`codehive on\` over SSH."
+  # Run from a session, this command is inside one of these servers, so queue
+  # the stops instead of waiting for them
+  systemctl --user stop --no-block claude-rc-launcher.service ${units[@]+"${units[@]}"}
+}
+
+cmd_on() {
+  local root
+  rm -f "$CODEHIVE_DATA/off"
+  systemctl --user enable --now --quiet claude-rc-launcher.service claude-rc-sync.timer
+  for root in "${PROJECT_DIRS[@]}"; do
+    systemctl --user enable --now --quiet "claude-rc-watch@$(systemd-escape --path "$root").path"
+  done
+  sync_now
+  echo "codehive is on. Servers start for every trusted project."
 }
 
 cmd="${1:-help}"
@@ -202,6 +306,8 @@ case "$cmd" in
                "mark a project with .no-rc to keep it off"
              sync_now ;;
   dirs)      printf '%s\n' "${PROJECT_DIRS[@]}" ;;
+  off)       cmd_off ;;
+  on)        cmd_on ;;
   version|--version) cmd_version ;;
   update)    cmd_update "$@" ;;
   uninstall) exec "$CODEHIVE_DATA/uninstall.sh" "$@" ;;

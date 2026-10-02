@@ -14,7 +14,11 @@ codehive restart
 codehive update
 ```
 
-This downloads the installer from the same repo and branch you installed from and runs it again. Your saved settings are reused, so no options are needed, though any installer option can be passed (for example `codehive update --yes`). `--ref <branch or tag>` installs a different version, and `--repo <owner/name>` installs from a fork. Both are remembered for the next update. Running servers keep going; if the service files changed, the installer tells you to run `codehive restart`.
+By default, this installs the newest release. It first lists the release notes of every release since the version you have, and asks before installing. `--yes` skips the question. If you already have the newest release, it reinstalls it, which is how you apply changed settings on an install made with curl.
+
+Your saved settings are reused, so no options are needed, though any installer option can be passed. `--ref <tag>` installs a specific release and stays on it. `--ref main` follows the latest commit on `main` instead of releases, including changes that haven't been through a nightly build yet. `--ref latest` goes back to following releases. `--repo <owner/name>` installs from a fork. Both `--ref` and `--repo` are remembered for the next update. Running servers keep going; if the service files changed, the installer tells you to run `codehive restart`.
+
+Every update runs code from GitHub as you. Following releases means you only get builds that are listed on the [releases page](https://github.com/nstuck/codehive/releases) with their changes, and you see those changes before anything is installed.
 
 If you installed from a clone, update there instead:
 
@@ -38,4 +42,4 @@ codehive is built nightly, whenever something changed. Each build is a release n
 
 The check is a single request to `api.github.com`, made around midnight plus up to four hours, or at the next boot if the server was off. It sends nothing about you or your projects. If the check fails, it tries again the next day. To see its results, run `journalctl --user -u claude-rc-update-check`. To turn it off, set `UPDATE_CHECK=0` in the config, or run the installer with `--no-update-check`.
 
-An install that follows `main`, the default, reports the version of the last nightly build, even if it includes changes made since then. The next nightly build brings a notice, and `codehive update` gets you everything up to it.
+An install that follows `main` (`--ref main`) reports the version of the last nightly build, even if it includes changes made since then.

@@ -6,6 +6,18 @@ Each build is also published on the [releases page](https://github.com/nstuck/co
 
 ## [Unreleased]
 
+### Added
+
+- `codehive off` stops every server, including the launcher, and keeps them stopped across reboots until `codehive on`. The launcher can run `codehive off` when you ask it to.
+- `codehive status` ends with security notes about settings and account details that let sessions do more without asking, such as `AUTO_TRUST=1` or passwordless `sudo`.
+- `HARDEN` setting (`--harden`), off by default, that stops sessions from gaining privileges, so `sudo`, `su`, and other setuid programs don't work in them.
+- A security model that separates the risks that come with Remote Control from the ones codehive adds. See [Security model](https://github.com/nstuck/codehive/blob/main/docs/security.md).
+
+### Changed
+
+- **Action needed:** `codehive update` and the `curl | bash` install now install the newest release instead of the latest commit on `main`, and `update` shows the release notes of every release since yours and asks before installing. Installs made before this keep following `main`. To follow releases, run `codehive update --ref latest` once.
+- The launcher's settings deny `codehive trust`, `untrust`, `update`, `restart`, and `uninstall`. The launcher now gives you the command to run over SSH instead.
+
 ## [2026.10.02] - 2026-10-02
 
 The first release.
