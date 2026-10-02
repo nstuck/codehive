@@ -1,8 +1,10 @@
 # Check every change: lint the scripts, run the tests that need nothing but a
-# sandbox, then install codehive for real on each runner and run the
-# integration tests against its systemd user manager. Claude Code is replaced
-# by test/fake-claude, so no Claude account is needed. The nightly build runs
-# this too and only publishes a build that passes.
+# sandbox, then install codehive for real and run the integration tests
+# against a systemd user manager, on Ubuntu 24.04 and on Debian 13 booted in a
+# container, each on x86_64 and ARM64. Claude Code is replaced by
+# test/fake-claude, so no Claude account is needed; a separate job checks that
+# the real Claude Code still accepts what codehive passes it. The nightly build
+# runs this too and only publishes a build that passes.
 name: CI
 
 on:
@@ -76,3 +78,73 @@ jobs:
         run: |
           systemctl --user list-units --all --no-pager 'claude-rc*' || true
           journalctl --user --no-pager -n 300 || true
+
+  debian13:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    env:
+      AS_TESTER: >-
+        docker exec -u tester -w /home/tester/codehive -e HOME=/home/tester -e USER=tester
+        -e XDG_RUNTIME_DIR=/run/user/1000 -e GITHUB_ACTIONS=true debian
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Boot Debian 13 with systemd
+        run: |
+          docker build -q -t codehive-debian13 -f test/debian13.Dockerfile test
+          docker run -d --name debian --privileged --cgroupns=private \
+            --tmpfs /run --tmpfs /run/lock --tmpfs /tmp codehive-debian13
+          # shellcheck disable=SC2016  # expanded inside the container
+          timeout 60 docker exec debian sh -c \
+            'until [ "$(systemctl is-system-running)" = running ] || [ "$(systemctl is-system-running)" = degraded ]; do sleep 1; done'
+          docker cp . debian:/home/tester/codehive
+          docker exec debian chown -R tester: /home/tester/codehive
+          docker exec debian loginctl enable-linger tester
+          # shellcheck disable=SC2016  # expanded by the inner sh, which has AS_TESTER
+          timeout 60 sh -c 'until $AS_TESTER systemctl --user show-environment >/dev/null 2>&1; do sleep 1; done'
+
+      - name: Run the sandboxed tests
+        run: $AS_TESTER bats test/unit.bats
+
+      - name: Run the integration tests
+        run: $AS_TESTER bats test/integration.bats
+
+      - name: Show the services and their logs
+        if: failure()
+        run: |
+          docker exec debian systemctl --no-pager --failed || true
+          $AS_TESTER systemctl --user list-units --all --no-pager 'claude-rc*' || true
+          docker exec debian journalctl --no-pager -n 300 || true
+
+  # The tests use a fake Claude Code, which can't notice when the real one
+  # changes. This installs the real one, not signed in, and checks the parts
+  # codehive relies on.
+  claude-code:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install Claude Code
+        run: curl -fsSL https://claude.ai/install.sh | bash
+
+      - name: Check what codehive passes to Remote Control
+        run: |
+          claude="$HOME/.local/bin/claude"
+          "$claude" --version
+          help="$("$claude" remote-control --help 2>&1)" || { printf '%s\n' "$help"; exit 1; }
+          missing=0
+          # claude-rc-run passes --name, --spawn same-dir or worktree, and --permission-mode
+          for want in "--name <" "--spawn <" "same-dir" "worktree" "--permission-mode <"; do
+            grep -qF -- "$want" <<<"$help" || { echo "::error::remote-control --help no longer mentions: $want"; missing=1; }
+          done
+          [ "$missing" = 0 ] || { printf '%s\n' "$help"; exit 1; }
+
+      - name: Check the sign-in status the installer reads
+        run: |
+          # install.sh looks for "authMethod": "claude.ai" in this JSON
+          out="$("$HOME/.local/bin/claude" auth status 2>&1)" || true
+          printf '%s\n' "$out"
+          python3 -c 'import json, sys; d = json.loads(sys.argv[1]); assert "loggedIn" in d, "no loggedIn key"' "$out"
