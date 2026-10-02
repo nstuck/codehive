@@ -130,17 +130,21 @@ jobs:
       - name: Install Claude Code
         run: curl -fsSL https://claude.ai/install.sh | bash
 
-      - name: See how Remote Control handles options when signed out
-        continue-on-error: true
+      # Signed out, `claude remote-control` refuses before it reads its options,
+      # even --help, so this looks for their help text in the binary instead.
+      # That catches an option that was renamed or removed, not one whose
+      # meaning changed. --name and --permission-mode also appear in other
+      # commands' help, so --spawn is the strongest check.
+      - name: Check what codehive passes to Remote Control
         run: |
-          claude="$HOME/.local/bin/claude"
+          claude="$(readlink -f "$HOME/.local/bin/claude")"
           "$claude" --version
-          echo "--- codehive's options:"
-          "$claude" remote-control --name ci --spawn worktree --permission-mode default 2>&1 || echo "(exit $?)"
-          echo "--- an unknown option:"
-          "$claude" remote-control --no-such-option 2>&1 || echo "(exit $?)"
-          echo "--- a bad spawn mode:"
-          "$claude" remote-control --spawn no-such-mode 2>&1 || echo "(exit $?)"
+          missing=0
+          # claude-rc-run passes --name, --spawn same-dir or worktree, and --permission-mode
+          for want in "--name <name>" "--spawn <mode>" "Spawn mode: same-dir, worktree" "--permission-mode <mode>"; do
+            grep -qaF -- "$want" "$claude" || { echo "::error::Claude Code no longer mentions: $want"; missing=1; }
+          done
+          exit "$missing"
 
       - name: Check the sign-in status the installer reads
         run: |

@@ -11,7 +11,8 @@ codehive runs on 64-bit Linux systems that Claude Code supports and that use sys
 
 | System | Status | Tested |
 |---|---|---|
-| Debian 13, x86_64 | Works. codehive is developed here. | Tested |
+| Debian 13, x86_64 | Works. codehive is developed here, and its automated tests run here on every change. | Tested |
+| Debian 13, ARM64 | Expected to work. codehive's automated tests pass here on every change. | Partially tested |
 | Ubuntu 24.04, x86_64 and ARM64 | Expected to work. codehive's automated tests pass here on every change. | Partially tested |
 | Debian 10+ and other Ubuntu 20.04+ | Expected to work. Claude Code officially supports these. | Unconfirmed |
 | Fedora, and RHEL 8+ with its rebuilds (Rocky, AlmaLinux) | Expected to work. Claude Code publishes dnf packages for them. | Unconfirmed |

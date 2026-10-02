@@ -19,7 +19,7 @@ bats test/unit.bats
 
 **Don't run these on a machine you use.** They install codehive for the current user, put `fake-claude` at `~/.local/bin/claude`, start and stop real services, and uninstall everything with `--purge` at the end. They refuse to start if codehive or Claude Code is already installed, or from inside a codehive server, but use a throwaway VM or container anyway.
 
-CI runs them on every push. To run them yourself, on a throwaway machine with a systemd user manager and lingering turned on:
+CI runs them on every push, on Ubuntu 24.04 directly and on Debian 13 in a container booted with systemd (`debian13.Dockerfile`). To run them yourself, on a throwaway machine with a systemd user manager and lingering turned on:
 
 ```bash
 CODEHIVE_INTEGRATION=1 bats test/integration.bats

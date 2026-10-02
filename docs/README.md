@@ -25,5 +25,6 @@
 
 **Contributing**
 
+- [Developing](../DEVELOPING.md): working on codehive without touching your own install
 - [Releasing](../RELEASING.md): version numbers, tests, nightly builds, and promoting a build to a release
 - [Changelog](../CHANGELOG.md)
