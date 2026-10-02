@@ -6,6 +6,8 @@ Each build is published as a prerelease on the [releases page](https://github.co
 
 ## [Unreleased]
 
+## [2026.10.02.2] - 2026-10-02
+
 ### Added
 
 - `codehive delete <project>` stops a project's server, takes away its trust, and deletes its folder. It first shows what would be lost, such as uncommitted changes, session worktrees, and commits that aren't on a remote, and asks you to type the project's name. `--yes` skips the question. The launcher's settings deny it, so the launcher gives you the command to run over SSH instead.
@@ -48,6 +50,7 @@ The first release.
 - `codehive update` to reinstall from the repo and branch codehive came from.
 - Server output is filtered before it reaches the journal, so status redraws don't flood the logs.
 
-[Unreleased]: https://github.com/nstuck/codehive/compare/v2026.10.02.1...HEAD
+[Unreleased]: https://github.com/nstuck/codehive/compare/v2026.10.02.2...HEAD
+[2026.10.02.2]: https://github.com/nstuck/codehive/releases/tag/v2026.10.02.2
 [2026.10.02.1]: https://github.com/nstuck/codehive/releases/tag/v2026.10.02.1
 [2026.10.02]: https://github.com/nstuck/codehive/releases/tag/v2026.10.02
