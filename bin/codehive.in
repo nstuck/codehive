@@ -19,6 +19,8 @@ usage: codehive <command> [args]
   trust <path>...           mark folders as trusted, as if you accepted the trust
                             dialog, and start their servers
   untrust <path>...         stop trusting folders and stop their servers
+  delete <project> [--yes]  stop a project's server, forget its trust, and delete
+                            its folder, after showing what would be lost
   dirs                      list the configured project folders
   off                       stop every server, including the launcher, until \`codehive on\`
   on                        start the servers again after \`codehive off\`
@@ -42,10 +44,9 @@ sync_now() {
   systemctl --user start claude-rc-sync.service
 }
 
-# Print the unit for a project given by name, path, or "launcher"
-resolve_unit() {
-  local arg="$1" dir root matches=()
-  if [ "$arg" = launcher ]; then echo claude-rc-launcher.service; return; fi
+# Print the folder of a project given by name or path
+resolve_dir() {
+  local arg="$1" root matches=()
   if [[ "$arg" == */* ]] && [ -d "$arg" ]; then
     matches=("$(normpath "$arg")")
   else
@@ -53,11 +54,20 @@ resolve_unit() {
       [ -d "$root/$arg" ] && matches+=("$root/$arg")
     done
   fi
+  [ "$arg" != . ] && [ "$arg" != .. ] || matches=()
   case ${#matches[@]} in
     0) die "no project named '$arg' in: ${PROJECT_DIRS[*]}" ;;
-    1) unit_for "${matches[0]}" ;;
+    1) echo "${matches[0]}" ;;
     *) die "'$arg' is ambiguous; use a path: ${matches[*]}" ;;
   esac
+}
+
+# Print the unit for a project given by name, path, or "launcher"
+resolve_unit() {
+  local dir
+  if [ "$1" = launcher ]; then echo claude-rc-launcher.service; return; fi
+  dir="$(resolve_dir "$1")"
+  unit_for "$dir"
 }
 
 cmd_new() {
@@ -174,6 +184,78 @@ cmd_restart() {
     systemctl --user restart "$unit"
     echo "Restarted $1"
   fi
+}
+
+# Print what deleting a git project would lose that isn't kept anywhere else
+git_losses() {
+  local dir="$1" n
+  git -C "$dir" rev-parse --git-dir >/dev/null 2>&1 || return 0
+  # Session worktrees live in .claude/worktrees and are counted on their own
+  n="$(git -C "$dir" status --porcelain -- . ':!.claude/worktrees' 2>/dev/null | wc -l)"
+  [ "$n" = 0 ] || echo "files with uncommitted changes: $n"
+  n="$(git -C "$dir" worktree list --porcelain 2>/dev/null | grep -c '^worktree ')" || true
+  [ "${n:-1}" -le 1 ] || echo "other worktrees, with their sessions' work: $((n - 1))"
+  if [ -z "$(git -C "$dir" remote)" ]; then
+    echo "no remote, so every commit exists only here"
+  else
+    n="$(git -C "$dir" rev-list --count --branches --not --remotes 2>/dev/null)" || n=0
+    [ "$n" = 0 ] || echo "commits that aren't on any remote: $n"
+  fi
+}
+
+cmd_delete() {
+  local arg="" yes=0 dir name unit losses reply
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -y|--yes) yes=1; shift ;;
+      -*) die "unknown option: $1" ;;
+      *) [ -z "$arg" ] || die "usage: codehive delete <project> [--yes]"; arg="$1"; shift ;;
+    esac
+  done
+  [ -n "$arg" ] || die "usage: codehive delete <project> [--yes]"
+  [ "$arg" != launcher ] || die "the launcher isn't a project; \`codehive uninstall\` removes it"
+  dir="$(resolve_dir "$arg")"
+  dir="$(normpath "$dir")"
+  name="$(basename "$dir")"
+  # Only ever a folder directly inside a project folder, never a project
+  # folder itself or the launcher
+  printf '%s\n' "${PROJECT_DIRS[@]}" | grep -qxF -- "$(dirname "$dir")" \
+    || die "$dir isn't inside a project folder: ${PROJECT_DIRS[*]}"
+  ! printf '%s\n' "${PROJECT_DIRS[@]}" "$LAUNCHER_DIR" | grep -qxF -- "$dir" \
+    || die "$dir is a project folder or the launcher, not a project"
+
+  # Stopping the server would end this command partway
+  for unit in "claude-rc@$(systemd-escape --path "$dir").service" \
+              "claude-rc-plain@$(systemd-escape --path "$dir").service"; do
+    grep -qF -- "/$unit/" /proc/self/cgroup 2>/dev/null \
+      && die "this runs in $name's own server; run it over SSH or from another project"
+  done
+
+  if [ -L "$dir" ]; then
+    echo "$dir is a link to $(readlink -- "$dir"); only the link is removed."
+  else
+    echo "This deletes $dir and everything in it."
+    losses="$(git_losses "$dir")"
+    [ -z "$losses" ] || { echo "It holds:"; printf '%s\n' "$losses" | sed 's/^/  - /'; }
+  fi
+  if [ "$yes" = 0 ]; then
+    [ -t 0 ] || die "pass --yes to delete $name without being asked"
+    read -r -p "Type the project's name to delete it: " reply
+    [ "$reply" = "$name" ] || { echo "Not deleting."; return 0; }
+  fi
+
+  # Hold the sync's lock so it can't start the server again partway
+  exec 9>"${XDG_RUNTIME_DIR:-/tmp}/codehive-sync.lock"
+  flock 9
+  # Forget trust, so a new folder with this name has to be reviewed again
+  "$CODEHIVE_DATA/libexec/claude-trust" --remove "$dir"
+  for unit in "claude-rc@$(systemd-escape --path "$dir").service" \
+              "claude-rc-plain@$(systemd-escape --path "$dir").service"; do
+    systemctl --user disable --now --quiet "$unit" 2>/dev/null || true
+  done
+  if [ -L "$dir" ]; then rm -f -- "$dir"; else rm -rf -- "$dir"; fi
+  exec 9>&-
+  echo "Deleted $name"
 }
 
 # Print the newest release's tag on the first line, then the notes of every
@@ -305,6 +387,7 @@ case "$cmd" in
              [ "$AUTO_TRUST" = 1 ] && warn "AUTO_TRUST=1 trusts every project again on the next sync;" \
                "mark a project with .no-rc to keep it off"
              sync_now ;;
+  delete)    cmd_delete "$@" ;;
   dirs)      printf '%s\n' "${PROJECT_DIRS[@]}" ;;
   off)       cmd_off ;;
   on)        cmd_on ;;

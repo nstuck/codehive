@@ -6,13 +6,17 @@ Each build is published as a prerelease on the [releases page](https://github.co
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- Several project changes in a few seconds, such as making or trusting a few projects in a row, no longer make `codehive` commands fail with "Job for claude-rc-sync.service failed", or stop a project folder's watch from noticing new and removed projects until a restart.
+- `codehive delete <project>` stops a project's server, takes away its trust, and deletes its folder. It first shows what would be lost, such as uncommitted changes, session worktrees, and commits that aren't on a remote, and asks you to type the project's name. `--yes` skips the question. The launcher's settings deny it, so the launcher gives you the command to run over SSH instead.
 
 ### Changed
 
 - Nightly builds are published as prereleases, and only become releases after they've been tried on a real server. The installer, `codehive update`, and the update notice only offer releases, so you get fewer, tested updates. A release's notes cover every nightly build since the last release. To try a nightly build anyway, run `codehive update --ref <tag>`.
+
+### Fixed
+
+- Several project changes in a few seconds, such as making or trusting a few projects in a row, no longer make `codehive` commands fail with "Job for claude-rc-sync.service failed", or stop a project folder's watch from noticing new and removed projects until a restart.
 
 ## [2026.10.02.1] - 2026-10-02
 
