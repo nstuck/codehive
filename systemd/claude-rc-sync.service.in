@@ -1,5 +1,9 @@
 [Unit]
 Description=Sync Claude Remote Control servers with the project folders
+# Commands and the folder watches start a sync on every change, often several
+# in a few seconds. Without this, systemd refuses after 5 starts in 10 seconds,
+# and the watch that hit the limit stops watching. Runs never overlap (flock).
+StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot

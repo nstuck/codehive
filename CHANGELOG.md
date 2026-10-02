@@ -6,6 +6,10 @@ Each build is published as a prerelease on the [releases page](https://github.co
 
 ## [Unreleased]
 
+### Fixed
+
+- Several project changes in a few seconds, such as making or trusting a few projects in a row, no longer make `codehive` commands fail with "Job for claude-rc-sync.service failed", or stop a project folder's watch from noticing new and removed projects until a restart.
+
 ### Changed
 
 - Nightly builds are published as prereleases, and only become releases after they've been tried on a real server. The installer, `codehive update`, and the update notice only offer releases, so you get fewer, tested updates. A release's notes cover every nightly build since the last release. To try a nightly build anyway, run `codehive update --ref <tag>`.
