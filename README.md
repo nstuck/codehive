@@ -3,7 +3,7 @@
 codehive turns a Linux server into a home base for Claude Code that you can use from the Claude iOS app, a web browser, or the Claude Desktop app. You can open any project, start new sessions, and create new projects without SSH.
 
 > [!WARNING]
-> **codehive puts convenience ahead of security.** It keeps a Claude Code server running at all times for every project, and anyone signed in to your claude.ai account can use them to run commands on your server as your user. Some of these risks come with Claude Code's Remote Control feature itself, and some come from what codehive adds. Read the [Security model](docs/security.md) and make sure you understand it before you install codehive.
+> **codehive puts convenience ahead of security.** It keeps a Claude Code server running at all times for every project, and anyone signed in to your claude.ai account can use them to run commands on your server as your user. Some of these risks come with Claude Code's Remote Control feature itself, and some come from what codehive adds. codehive's guardrails are a reasonable effort, not an audited security boundary (see [About this project](#about-this-project)). Read the [Security model](docs/security.md) and make sure you understand it before you install codehive.
 
 Your files and code stay on the server, and the commands Claude runs execute there. As with any Claude Code session, your prompts, the file contents Claude reads, and the conversation go to Anthropic, which runs the model and keeps the transcript in sync across your devices. See [Where your data lives](docs/network-and-data.md#where-your-data-lives).
 
@@ -53,6 +53,14 @@ All documentation is in [docs/](docs/README.md):
 - [How it works](docs/how-it-works.md), [Network and data](docs/network-and-data.md), and [Security model](docs/security.md)
 
 Changes between versions are listed in [CHANGELOG.md](CHANGELOG.md). [DEVELOPING.md](DEVELOPING.md) covers working on codehive itself, and [RELEASING.md](RELEASING.md) covers version numbers, tests, nightly builds, and releases.
+
+## About this project
+
+codehive is my first public project, and it's vibe coded: it was written entirely with Claude Code, and it will keep being made that way. Every build is tried on a real server before it becomes a release.
+
+I'm not a security specialist. I've made every reasonable effort to put guardrails in place wherever they don't get in the way of what codehive is for, and the [Security model](docs/security.md) lists the risks I know about and what codehive does about each. The guardrails haven't been audited, though, and I expect someone with real security expertise could find ways around them. Read the security model before you install, and decide for yourself whether the trade-offs suit your server.
+
+Suggestions and bug reports are welcome as [GitHub issues](https://github.com/nstuck/codehive/issues).
 
 ## License
 

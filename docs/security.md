@@ -4,7 +4,17 @@
 
 **codehive puts convenience ahead of security.** Its purpose is to make every project on your server reachable from any device at any time, and that's also what makes it risky. Read this page before you install it.
 
+**That's convenience over security, not convenience at any cost.** codehive exists to take the friction out of Claude Code's Remote Control sessions, and some of that friction is safety steps: a server you have to start by hand in a terminal, and a trust dialog only a terminal can answer. Removing those takes automation, and that automation is where most of codehive's risks come from. Where a guardrail doesn't get in the way of what codehive is for, codehive keeps it: settings that skip a review step are off by default, folders you add yourself wait for `codehive trust`, the launcher's settings deny commands it doesn't need, and `codehive status` points out settings that let sessions do more without asking.
+
 codehive is a layer over Claude Code's Remote Control feature. Each server it runs is a plain `claude remote-control`, the same one you'd start by hand in a terminal. Some of the risks below come with Remote Control itself, no matter how you run it. Others exist because of what codehive adds: servers that are always running, a launcher, and accepting workspace trust for you. This page keeps the two apart, so you can tell which risks you take on by using Remote Control at all and which come from choosing codehive.
+
+## How far to trust the guardrails
+
+codehive is vibe coded: it was written entirely with Claude Code, and it will keep being made that way. I'm not a security specialist. I've made every reasonable effort to put guardrails in place, as far as they don't get in the way of what codehive is for, and this page describes every risk I know about. That isn't the same as a security review. The guardrails haven't been audited, and I expect someone with real security expertise could find ways around them that I haven't thought of.
+
+Treat them as a way to catch mistakes and limit damage, not as a wall that keeps a determined attacker out. The protections that matter most are outside codehive: keeping your claude.ai account secure, turning on Trusted Devices, and running codehive under a user account that holds nothing you can't afford to lose. See [Optional hardening](#optional-hardening).
+
+If you find a way around a guardrail, or something on this page is wrong or missing, please [open an issue](https://github.com/nstuck/codehive/issues).
 
 ## Risks that come with Remote Control
 
