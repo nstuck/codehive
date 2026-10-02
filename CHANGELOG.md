@@ -6,6 +6,8 @@ Each build is also published on the [releases page](https://github.com/nstuck/co
 
 ## [Unreleased]
 
+## [2026.10.02] - 2026-10-02
+
 The first release.
 
 ### Added
@@ -20,4 +22,5 @@ The first release.
 - `codehive update` to reinstall from the repo and branch codehive came from.
 - Server output is filtered before it reaches the journal, so status redraws don't flood the logs.
 
-[Unreleased]: https://github.com/nstuck/codehive/commits/main
+[Unreleased]: https://github.com/nstuck/codehive/compare/v2026.10.02...HEAD
+[2026.10.02]: https://github.com/nstuck/codehive/releases/tag/v2026.10.02
