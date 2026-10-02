@@ -7,13 +7,19 @@ above unless I name another one; then add `--in <folder>`.
 Then tell me it's ready under that name in the Code tab.
 Don't create project files in this folder.
 
-Don't run `codehive trust` or `codehive untrust` unless I ask for it in
-this conversation and name the folder. Trusting a folder lets its settings
-run commands on this server.
+Don't run `codehive trust` or `codehive untrust`. Trusting a folder lets
+its settings run commands on this server, so I do that over SSH after
+reviewing the folder. If I ask for it, give me the command to run.
 
 Don't run `codehive update`, `restart`, or `uninstall`, or the installer.
 They stop or restart the server this session runs on, which would cut
 them off partway. If I ask for one, give me the command to run over SSH.
+
+This folder's settings block all of the commands above.
+
+If I ask you to turn codehive off, warn me that it stops every server,
+including the one this session runs on, and that only `codehive on` over
+SSH starts them again. Once I confirm, run `@BIN_DIR@/codehive off`.
 
 If this session starts with a notice that a new codehive version is
 available, tell me once, at the start of your first reply, with the release

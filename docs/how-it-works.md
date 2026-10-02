@@ -24,7 +24,7 @@ This page explains the services codehive runs and how they keep the servers matc
 
 Projects live in one or more project folders: `~/projects` by default, or any list you set in `~/.config/codehive/config`. Each project inside them has its own long-running `claude remote-control` process. Each process appears as one entry in every client's session list and can run many sessions at once. The launcher is the same kind of process, but it lives outside the project folders. Its only job is to create new projects.
 
-Everything is managed with one command, `codehive` (`new`, `status`, `logs`, `restart`, `sync`, `trust`, `untrust`, `dirs`, `version`, `update`, `uninstall`). Changes between versions are listed in [CHANGELOG.md](../CHANGELOG.md).
+Everything is managed with one command, `codehive` (`new`, `status`, `logs`, `restart`, `sync`, `trust`, `untrust`, `dirs`, `off`, `on`, `version`, `update`, `uninstall`). Changes between versions are listed in [CHANGELOG.md](../CHANGELOG.md).
 
 ---
 

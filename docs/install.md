@@ -55,13 +55,16 @@ The servers inherit your environment, so make sure nothing in it blocks Remote C
 curl -fsSL https://raw.githubusercontent.com/nstuck/codehive/main/install.sh | bash
 ```
 
-This downloads the repo to a temporary folder, runs its installer, and deletes the temporary folder afterwards. Questions are asked on your terminal as usual.
+This downloads the newest release to a temporary folder, runs its installer, and deletes the temporary folder afterwards. Questions are asked on your terminal as usual.
 
-To read the code before running it, clone the repo instead:
+Before you install, read the [Security model](security.md). codehive keeps a server running for every project at all times, and anyone signed in to your claude.ai account can use them to run commands as you.
+
+To read the code before running it, clone the repo instead. A clone is on `main`, so check out a release tag first if you want one:
 
 ```bash
 git clone https://github.com/nstuck/codehive.git ~/codehive
 cd ~/codehive
+git checkout v2026.10.02   # optional: a tag from the releases page
 ./install.sh
 ```
 
@@ -73,7 +76,7 @@ curl -fsSL https://raw.githubusercontent.com/nstuck/codehive/main/install.sh | b
 ./install.sh --project-dir ~/projects --project-dir ~/work
 ```
 
-To install a specific release instead of the latest `main`, set `CODEHIVE_REF` to a tag from the [releases page](https://github.com/nstuck/codehive/releases) or a branch:
+To install a specific release instead of the newest one, set `CODEHIVE_REF` to a tag from the [releases page](https://github.com/nstuck/codehive/releases). `CODEHIVE_REF=main` installs the latest commit on `main`, including changes that haven't been through a nightly build yet:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nstuck/codehive/main/install.sh | CODEHIVE_REF=v2026.10.02 bash
@@ -91,6 +94,7 @@ curl -fsSL https://raw.githubusercontent.com/nstuck/codehive/main/install.sh | C
 | `--launcher-autoapprove` | off | Let the launcher run `codehive new` without asking each time |
 | `--auto-trust` | off | Trust every project folder automatically. Read [Workspace trust](workspace-trust.md) first. |
 | `--no-update-check` | checks on | Don't check GitHub for new codehive releases (see [Update notices](updating.md#update-notices)) |
+| `--harden` | off | Stop sessions from gaining privileges, so `sudo`, `su`, and other setuid programs don't work in them (see [Optional hardening](security.md#optional-hardening)) |
 | `-y`, `--yes` | | Don't ask for confirmation |
 
 Your choices are saved to `~/.config/codehive/config` and reused the next time you run the installer, so you only pass them once. Project folders can't be inside each other or contain the launcher folder.
@@ -103,7 +107,7 @@ The installer:
 4. Marks the launcher folder as trusted (see [Workspace trust](workspace-trust.md)).
 5. Turns on lingering (`sudo loginctl enable-linger`), so the services keep running when you're logged out and start at boot.
 6. Starts the launcher, the sync timer, the daily update check, and a watch on each project folder, then starts a server for every trusted project.
-7. Prints `codehive status`.
+7. Prints `codehive status`, which ends with security notes if any of your settings, or your user account, let sessions do more without asking.
 
 The installer can be run again at any time. It rewrites the installed files from the repo and the config, and leaves running servers alone. If the service files changed, it tells you to run `codehive restart`.
 

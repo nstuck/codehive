@@ -11,6 +11,12 @@ set -uo pipefail
 exec 9>"${XDG_RUNTIME_DIR:-/tmp}/codehive-sync.lock"
 flock 9
 
+# `codehive off` stopped everything on purpose; only `codehive on` starts it again
+if is_off; then
+  echo "codehive is off; run \`codehive on\` to start the servers"
+  exit 0
+fi
+
 for root in "${PROJECT_DIRS[@]}"; do
   [ -d "$root" ] || warn "project folder missing: $root"
 done

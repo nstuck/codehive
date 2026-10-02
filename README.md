@@ -2,6 +2,9 @@
 
 codehive turns a Linux server into a home base for Claude Code that you can use from the Claude iOS app, a web browser, or the Claude Desktop app. You can open any project, start new sessions, and create new projects without SSH.
 
+> [!WARNING]
+> **codehive puts convenience ahead of security.** It keeps a Claude Code server running at all times for every project, and anyone signed in to your claude.ai account can use them to run commands on your server as your user. Some of these risks come with Claude Code's Remote Control feature itself, and some come from what codehive adds. Read the [Security model](docs/security.md) and make sure you understand it before you install codehive.
+
 Your files and code stay on the server, and the commands Claude runs execute there. As with any Claude Code session, your prompts, the file contents Claude reads, and the conversation go to Anthropic, which runs the model and keeps the transcript in sync across your devices. See [Where your data lives](docs/network-and-data.md#where-your-data-lives).
 
 ## How it works
@@ -34,7 +37,8 @@ Then open the session list in any client and pick a project, or open **launcher*
 | `codehive trust <path>` | Trust a folder you added yourself, so it gets a server |
 | `codehive logs <name>` | Show a server's log |
 | `codehive restart [<name>]` | Restart one server, or all of them |
-| `codehive update` | Update codehive |
+| `codehive update` | Update codehive to the newest release |
+| `codehive off` / `on` | Stop every server until you turn them back on |
 
 Run `codehive restart`, `update`, and `uninstall` over SSH, not from a Claude session, because they can stop the server that session runs in. See [Daily use](docs/usage.md) for every command.
 

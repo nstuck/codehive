@@ -91,13 +91,15 @@ The defaults suit most setups. Here's what each setting decides. Write paths as 
 
 **`BIN_DIR`: where the `codehive` command goes.** The default, `~/.local/bin`, is already on `PATH` for most distributions, and it's where Claude Code installs itself. Choose another folder only if you have a reason to.
 
-**`PERMISSION_MODE`: how much sessions can do without asking.** Empty means Claude Code's default: Claude asks before running commands or editing files, and you approve each request from your client. `acceptEdits` lets it edit files without asking, which is more convenient on a phone but gives sessions more room. See [Optional hardening](security.md#optional-hardening).
+**`PERMISSION_MODE`: how much sessions can do without asking.** Empty means Claude Code's default: Claude asks before running commands or editing files, and you approve each request from your client. `acceptEdits` lets it edit files without asking, which is more convenient on a phone but gives sessions more room. See the [Security model](security.md).
 
 **`LAUNCHER_AUTOAPPROVE`: whether the launcher asks before creating a project.** With `0`, the default, you approve each `codehive new` from your client. `1` skips that prompt. Creating a project only makes an empty git repo, so the risk is low either way.
 
 **`AUTO_TRUST`: whether every project folder is trusted automatically.** Leave this at `0` unless you've read [Workspace trust](workspace-trust.md). With `0`, a folder you clone or copy in yourself gets no server until you review it and run `codehive trust`. With `1`, anything that lands in a project folder is trusted within a minute, and its settings can run commands as you.
 
 **`UPDATE_CHECK`: whether to check for new releases.** With `1`, codehive asks GitHub once a day whether there's a newer release, and tells you in `codehive status` and in the launcher. It sends nothing about you or your projects. Set it to `0` if the server shouldn't contact GitHub. See [Update notices](updating.md#update-notices).
+
+**`HARDEN`: whether sessions can gain privileges.** With `0`, the default, sessions can use `sudo` and other setuid programs the way you can. With `1`, they can't: `sudo`, `su`, and programs that need file capabilities, such as `ping`, fail in every session. See [Optional hardening](security.md#optional-hardening).
 
 Save the file and exit (in nano, Ctrl+O, Enter, Ctrl+X).
 
@@ -115,6 +117,21 @@ UNIT_PATH="${PATH//%/%%}"    # % has a special meaning in unit files
 LAUNCHER_ALLOW=""
 [ "$LAUNCHER_AUTOAPPROVE" = 1 ] && LAUNCHER_ALLOW="\"Bash($BIN_DIR/codehive new:*)\""
 
+# Commands the launcher must leave to you, in each way it might write them
+deny_cmds=(codehive "$BIN_DIR/codehive")
+[[ "$BIN_DIR" == "$HOME/"* ]] && deny_cmds+=("~/${BIN_DIR#"$HOME"/}/codehive")
+deny=()
+for c in "${deny_cmds[@]}"; do
+  for sub in trust untrust update restart uninstall; do deny+=("\"Bash($c $sub:*)\""); done
+done
+deny+=("\"Bash($CODEHIVE_DATA/libexec/claude-trust:*)\"")
+LAUNCHER_DENY="$(printf '%s,\n      ' "${deny[@]}")"
+LAUNCHER_DENY="${LAUNCHER_DENY%,*}"
+
+# Extra settings for the server units when HARDEN=1
+HARDEN_LINES=""
+[ "$HARDEN" = 1 ] && HARDEN_LINES=$'NoNewPrivileges=yes\nRestrictSUIDSGID=yes'
+
 # Fills in the @PLACEHOLDERS@ in the templates under bin/, systemd/, and launcher/
 render() {
   local content
@@ -127,6 +144,8 @@ render() {
   content="${content//@CODEHIVE_CONFIG@/"$CODEHIVE_CONFIG"}"
   content="${content//@CODEHIVE_DATA@/"$CODEHIVE_DATA"}"
   content="${content//@LAUNCHER_ALLOW@/"$LAUNCHER_ALLOW"}"
+  content="${content//@LAUNCHER_DENY@/"$LAUNCHER_DENY"}"
+  content="${content//@HARDEN@/"$HARDEN_LINES"}"
   content="${content//@PROJECT_DIRS_LIST@/"$(printf -- '- %s\n' "${PROJECT_DIRS[@]}")"}"
   printf '%s\n' "$content"
 }
@@ -198,7 +217,7 @@ If it isn't on your `PATH`, add `export PATH="$BIN_DIR:$PATH"` to `~/.bashrc`, u
 
 ## 7. Install the systemd units
 
-These unit files define the services. They're templates too: each one gets the path to `claude`, your `PATH`, and the codehive locations filled in.
+These unit files define the services. They're templates too: each one gets the path to `claude`, your `PATH`, and the codehive locations filled in. With `HARDEN=1`, the three server units also get `NoNewPrivileges=yes` and `RestrictSUIDSGID=yes`.
 
 ```bash
 mkdir -p "$UNIT_DIR"
@@ -216,7 +235,7 @@ They go in `~/.local/share/systemd/user`, the folder systemd reads for user unit
 
 ## 8. Set up the launcher
 
-The launcher's folder holds two files. `CLAUDE.md` tells the launcher's Claude how to create projects. `.claude/settings.json` holds the hook that shows update notices in launcher sessions, plus the `codehive new` permission if you set `LAUNCHER_AUTOAPPROVE=1`.
+The launcher's folder holds two files. `CLAUDE.md` tells the launcher's Claude how to create projects. `.claude/settings.json` holds the hook that shows update notices in launcher sessions, the deny rules that keep the launcher from running `codehive trust`, `untrust`, `update`, `restart`, and `uninstall`, plus the `codehive new` permission if you set `LAUNCHER_AUTOAPPROVE=1`.
 
 First check whether there's a settings file there that codehive didn't write:
 
@@ -239,7 +258,7 @@ chmod 644 "$LAUNCHER_DIR/CLAUDE.md" "$LAUNCHER_DIR/.claude/settings.json"
 OWN_SETTINGS=0
 ```
 
-If it prints *you have your own settings file*, the installer wouldn't replace it either. Write only `CLAUDE.md`, and add the hook and permission to your file by hand. [The launcher's settings](configuration.md#the-launchers-settings) shows what to add.
+If it prints *you have your own settings file*, the installer wouldn't replace it either. Write only `CLAUDE.md`, and add the hook, deny rules, and permission to your file by hand. [The launcher's settings](configuration.md#the-launchers-settings) shows what to add.
 
 ```bash
 render launcher/CLAUDE.md.in >"$LAUNCHER_DIR/CLAUDE.md"
@@ -309,6 +328,8 @@ If this fails because `~/.claude.json` doesn't exist yet, run `claude` once in a
 
 ## 12. Start everything
 
+If you're running the walkthrough again after `codehive off`, only run `systemctl --user daemon-reload` from this step, and run `codehive on` when you want the servers back.
+
 Tell systemd about the new units, then start the launcher, the sync timer, and the daily update check:
 
 ```bash
@@ -355,6 +376,7 @@ If the launcher isn't `active`, `codehive logs launcher` shows why. [Troubleshoo
 **Changing settings.** Edit the config, then run steps 4 to 12 again. Some settings need less:
 
 - A new `PERMISSION_MODE` only needs `codehive restart`.
+- A new `HARDEN` needs step 7 again, then `systemctl --user daemon-reload` and `codehive restart`.
 - A new `AUTO_TRUST` or `UPDATE_CHECK` applies on its own at the next sync or check.
 
 If you remove a project folder from `PROJECT_DIRS`, also stop its watch:

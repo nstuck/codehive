@@ -6,6 +6,7 @@ WorkingDirectory=%f
 Environment="PATH=@PATH@"
 Environment="CODEHIVE_CONFIG=@CODEHIVE_CONFIG@" "CODEHIVE_DATA=@CODEHIVE_DATA@"
 Environment="CLAUDE_BIN=@CLAUDE_BIN@"
+@HARDEN@
 ExecStart="@LIBEXEC@/claude-rc-run" worktree
 Restart=always
 RestartSec=10

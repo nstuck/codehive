@@ -21,7 +21,7 @@
 
 - [How it works](how-it-works.md): the services, the sync, and what happens when
 - [Network and data](network-and-data.md): how traffic flows, and where your data lives
-- [Security model](security.md): what your account protects, and hardening options
+- [Security model](security.md): which risks come from Remote Control and which from codehive, hardening, and what to do if your account is compromised
 
 **Contributing**
 
