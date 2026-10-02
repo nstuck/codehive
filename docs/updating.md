@@ -14,9 +14,9 @@ codehive restart
 codehive update
 ```
 
-By default, this installs the newest release. It first lists the release notes of every release since the version you have, and asks before installing. `--yes` skips the question. If you already have the newest release, it reinstalls it, which is how you apply changed settings on an install made with curl.
+By default, this installs the newest release. Nightly builds are published as prereleases first and become releases once they've been tried on a real server, so `codehive update` only offers those. It first lists the release notes of every release since the version you have, and asks before installing. `--yes` skips the question. If you already have the newest release, it reinstalls it, which is how you apply changed settings on an install made with curl.
 
-Your saved settings are reused, so no options are needed, though any installer option can be passed. `--ref <tag>` installs a specific release and stays on it. `--ref main` follows the latest commit on `main` instead of releases, including changes that haven't been through a nightly build yet. `--ref latest` goes back to following releases. `--repo <owner/name>` installs from a fork. Both `--ref` and `--repo` are remembered for the next update. Running servers keep going; if the service files changed, the installer tells you to run `codehive restart`.
+Your saved settings are reused, so no options are needed, though any installer option can be passed. `--ref <tag>` installs a specific release, or a nightly prerelease, and stays on it. `--ref main` follows the latest commit on `main` instead of releases, including changes that haven't been through a nightly build yet. `--ref latest` goes back to following releases. `--repo <owner/name>` installs from a fork. Both `--ref` and `--repo` are remembered for the next update. Running servers keep going; if the service files changed, the installer tells you to run `codehive restart`.
 
 Every update runs code from GitHub as you. Following releases means you only get builds that are listed on the [releases page](https://github.com/nstuck/codehive/releases) with their changes, and you see those changes before anything is installed.
 
@@ -38,7 +38,7 @@ codehive checks GitHub once a day for a newer release of the repo you installed 
 
 The notice gives the command that fits your install: `codehive update`, `codehive update --ref <new tag>` if you installed a specific release, or `git pull && ./install.sh` for a clone. Nothing updates on its own.
 
-codehive is built nightly, whenever something changed. Each build is a release named after the UTC date it was made, with tags like `v2026.10.03`, and lists its changes on the [releases page](https://github.com/nstuck/codehive/releases) and in [CHANGELOG.md](../CHANGELOG.md). Read them before updating, especially lines that start with **Action needed:**, which change how an existing install behaves or need something from you. If you skipped several releases, read each one since your version.
+codehive is built nightly, whenever something changed. Each build is named after the UTC date it was made, with tags like `v2026.10.03`, and is published as a prerelease on the [releases page](https://github.com/nstuck/codehive/releases). Builds that have been tried on a real server are promoted to releases, and only releases are offered by the update check and `codehive update`. A release's notes cover every nightly build since the release before it. Changes are also listed in [CHANGELOG.md](../CHANGELOG.md). Read them before updating, especially lines that start with **Action needed:**, which change how an existing install behaves or need something from you. If you skipped several releases, read each one since your version.
 
 The check is a single request to `api.github.com`, made around midnight plus up to four hours, or at the next boot if the server was off. It sends nothing about you or your projects. If the check fails, it tries again the next day. To see its results, run `journalctl --user -u claude-rc-update-check`. To turn it off, set `UPDATE_CHECK=0` in the config, or run the installer with `--no-update-check`.
 

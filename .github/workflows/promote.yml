@@ -1,0 +1,64 @@
+# Make a nightly prerelease a release, after you've tried it on a real server
+# (see RELEASING.md). Its notes are replaced with the notes of every nightly
+# build since the last release, so `codehive update` shows everything that
+# changed. Nothing is rebuilt: users get exactly the build you tried.
+name: Promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The prerelease to promote, like v2026.10.03 (default: the newest)"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: releases
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Pick the prerelease
+        run: |
+          if [ -z "$TAG" ]; then
+            TAG="$(gh release list --limit 100 --json tagName,isPrerelease \
+              -q '[.[] | select(.isPrerelease)][0].tagName')"
+            [ -n "$TAG" ] || { echo "There's no prerelease to promote" >&2; exit 1; }
+          fi
+          [ "$(gh release view "$TAG" --json isPrerelease -q .isPrerelease)" = true ] \
+            || { echo "$TAG isn't a prerelease" >&2; exit 1; }
+          echo "TAG=$TAG" >>"$GITHUB_ENV"
+          echo "Promoting $TAG"
+
+      - name: Collect the notes of every build since the last release
+        run: |
+          gh api --paginate --slurp "repos/$GH_REPO/releases?per_page=100" | jq 'add' >releases.json
+          python3 - <<'PY'
+          import json, os, re
+          def key(v): return [int(n) for n in re.findall(r"\d+", v)]
+          tag = os.environ["TAG"]
+          releases = [r for r in json.load(open("releases.json")) if not r["draft"]]
+          stable = [r for r in releases if not r["prerelease"]]
+          last = max(stable, key=lambda r: key(r["tag_name"]))["tag_name"] if stable else None
+          builds = sorted((r for r in releases
+                           if (last is None or key(r["tag_name"]) > key(last))
+                           and key(r["tag_name"]) <= key(tag)),
+                          key=lambda r: key(r["tag_name"]))
+          if last and key(tag) <= key(last):
+              raise SystemExit(f"{tag} isn't newer than the latest release, {last}")
+          parts = [f"Everything since {last.lstrip('v')}:" if last else "Everything so far:"]
+          for r in builds:
+              parts.append(f"## {r['name'] or r['tag_name']}\n\n{(r['body'] or 'No notable changes.').strip()}")
+          open("notes.md", "w").write("\n\n".join(parts) + "\n")
+          print(open("notes.md").read())
+          PY
+
+      - name: Make it the latest release
+        run: gh release edit "$TAG" --prerelease=false --latest --notes-file notes.md

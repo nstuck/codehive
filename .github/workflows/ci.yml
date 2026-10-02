@@ -1,0 +1,78 @@
+# Check every change: lint the scripts, run the tests that need nothing but a
+# sandbox, then install codehive for real on each runner and run the
+# integration tests against its systemd user manager. Claude Code is replaced
+# by test/fake-claude, so no Claude account is needed. The nightly build runs
+# this too and only publishes a build that passes.
+name: CI
+
+on:
+  # Every branch pushed here; pull requests only from forks, since a branch in
+  # this repo is already checked on push
+  push:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: command -v shellcheck || { sudo apt-get update -q && sudo apt-get install -yq shellcheck; }
+
+      - name: Check the shell scripts
+        run: |
+          shellcheck -x -s bash install.sh uninstall.sh bin/codehive.in lib/common.sh \
+            libexec/claude-rc-sync libexec/claude-rc-run libexec/claude-rc-update-check \
+            test/fake-claude test/helpers.bash test/unit.bats test/integration.bats
+          for f in install.sh uninstall.sh bin/codehive.in lib/common.sh libexec/claude-rc-*; do
+            head -1 "$f" | grep -q python || bash -n "$f"
+          done
+
+      - name: Check the Python scripts
+        run: |
+          python3 -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' \
+            libexec/claude-trust libexec/claude-rc-logfilter
+
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    # Pinned, not ubuntu-latest: docs/requirements.md names these versions
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats
+        run: sudo apt-get update -q && sudo apt-get install -yq bats dbus-user-session
+
+      - name: Run the sandboxed tests
+        run: bats test/unit.bats
+
+      - name: Start a systemd user manager
+        run: |
+          sudo loginctl enable-linger "$USER"
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >>"$GITHUB_ENV"
+          for _ in $(seq 30); do
+            XDG_RUNTIME_DIR="/run/user/$(id -u)" systemctl --user show-environment >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          echo "the systemd user manager didn't start" >&2
+          exit 1
+
+      - name: Run the integration tests
+        run: bats test/integration.bats
+
+      - name: Show the services and their logs
+        if: failure()
+        run: |
+          systemctl --user list-units --all --no-pager 'claude-rc*' || true
+          journalctl --user --no-pager -n 300 || true

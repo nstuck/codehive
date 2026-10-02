@@ -182,6 +182,7 @@ LAUNCHER_ALLOW=""
 
 # Commands the launcher must leave to you over SSH, in each way it might write them
 deny_cmds=(codehive "$BIN_DIR/codehive")
+# shellcheck disable=SC2088  # a literal ~, the way a session might type it
 [[ "$BIN_DIR" == "$HOME/"* ]] && deny_cmds+=("~/${BIN_DIR#"$HOME"/}/codehive")
 deny=()
 for c in "${deny_cmds[@]}"; do

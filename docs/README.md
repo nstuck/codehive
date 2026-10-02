@@ -25,5 +25,5 @@
 
 **Contributing**
 
-- [Releasing](../RELEASING.md): version numbers and nightly builds
+- [Releasing](../RELEASING.md): version numbers, tests, nightly builds, and promoting a build to a release
 - [Changelog](../CHANGELOG.md)

@@ -1,10 +1,14 @@
 # Changelog
 
-All notable changes to codehive are listed here. codehive is built every night that something changed. Versions are the UTC date of the build, such as `2026.10.03`, with `.1`, `.2` added for any extra builds on the same day. Changes that need something from you after updating start with **Action needed:**.
+All notable changes to codehive are listed here. codehive is built every night that something changed, and builds that have been tried on a real server become releases. Versions are the UTC date of the build, such as `2026.10.03`, with `.1`, `.2` added for any extra builds on the same day. Changes that need something from you after updating start with **Action needed:**.
 
-Each build is also published on the [releases page](https://github.com/nstuck/codehive/releases), and `codehive status` tells you when a newer one is out.
+Each build is published as a prerelease on the [releases page](https://github.com/nstuck/codehive/releases), and becomes a release once it's been tried. `codehive status` tells you when a newer release is out.
 
 ## [Unreleased]
+
+### Changed
+
+- Nightly builds are published as prereleases, and only become releases after they've been tried on a real server. The installer, `codehive update`, and the update notice only offer releases, so you get fewer, tested updates. A release's notes cover every nightly build since the last release. To try a nightly build anyway, run `codehive update --ref <tag>`.
 
 ## [2026.10.02.1] - 2026-10-02
 
