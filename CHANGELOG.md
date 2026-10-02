@@ -15,7 +15,7 @@ Each build is also published on the [releases page](https://github.com/nstuck/co
 
 ### Changed
 
-- **Action needed:** `codehive update` and the `curl | bash` install now install the newest release instead of the latest commit on `main`, and `update` shows the release notes of every release since yours and asks before installing. Installs made before this keep following `main`. To follow releases, run `codehive update --ref latest` once.
+- **Action needed:** `codehive update` and the `curl | bash` install now install the newest release instead of the latest commit on `main`, and `update` shows the release notes of every release since yours and asks before installing. Installs made before this keep following `main`, and their `codehive update` doesn't understand `--ref latest` yet. To follow releases, run `codehive update --ref main` first, then `codehive update --ref latest`.
 - The launcher's settings deny `codehive trust`, `untrust`, `update`, `restart`, and `uninstall`. The launcher now gives you the command to run over SSH instead.
 
 ## [2026.10.02] - 2026-10-02
