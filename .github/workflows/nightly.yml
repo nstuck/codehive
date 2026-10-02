@@ -29,7 +29,7 @@ jobs:
           echo "Builds are made from main only; run this workflow on main" >&2
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -59,7 +59,7 @@ jobs:
     steps:
       # The commit CI checked, not whatever main is now. If main moved since,
       # the push below fails and nothing is published; run the workflow again.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
