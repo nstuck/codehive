@@ -7,7 +7,7 @@
 | Create a project over SSH | `codehive new <name>`. Add `--in <folder>` (a project folder's name, like `work`, or its path) to use a folder other than the first. |
 | Add an existing project | `git clone ... ~/projects/name`, review it, then `codehive trust ~/projects/name`. With `AUTO_TRUST=1`, it's picked up right away without that step. |
 | Exclude a project | `touch ~/projects/name/.no-rc` |
-| Delete a project | `codehive delete <name>`. It shows what would be lost, such as uncommitted changes, session worktrees, and commits that aren't on a remote, and asks you to type the name. Then it stops the server, takes away the folder's trust, and deletes the folder. Add `--yes` to skip the question. Claude Code's own session history for the folder, in `~/.claude`, stays. |
+| Delete a project | `codehive delete <name>`. It shows what would be lost, such as uncommitted changes, session worktrees, and commits that aren't on a remote, and asks you to type the name. Then it stops the server, takes away the folder's trust, and deletes the folder. Add `--yes` to skip the question. Claude Code's own session history for the folder, in `~/.claude`, stays. The project's sessions stay listed in the Claude app, and nothing answers them; archive them there. |
 | Remove a project without deleting it | Move the folder out of the project folder, or delete it yourself. Its server stops right away. |
 | See everything | `codehive status` |
 | View logs | `codehive logs <name>` shows the last 50 lines. Extra arguments go to `journalctl` instead, like `-f` to follow or `--since today`. |
