@@ -60,7 +60,7 @@ codehive is my first public project, and it's vibe coded: it was written entirel
 
 I'm not a security specialist. I've made every reasonable effort to put guardrails in place wherever they don't get in the way of what codehive is for, and the [Security model](docs/security.md) lists the risks I know about and what codehive does about each. The guardrails haven't been audited, though, and I expect someone with real security expertise could find ways around them. Read the security model before you install, and decide for yourself whether the trade-offs suit your server.
 
-Suggestions and bug reports are welcome as [GitHub issues](https://github.com/nstuck/codehive/issues).
+Suggestions and bug reports are welcome as [GitHub issues](https://github.com/nstuck/codehive/issues). Please [report security problems privately](https://github.com/nstuck/codehive/security/advisories/new) instead.
 
 ## License
 

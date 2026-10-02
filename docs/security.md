@@ -14,7 +14,7 @@ codehive is vibe coded: it was written entirely with Claude Code, and it will ke
 
 Treat them as a way to catch mistakes and limit damage, not as a wall that keeps a determined attacker out. The protections that matter most are outside codehive: keeping your claude.ai account secure, turning on Trusted Devices, and running codehive under a user account that holds nothing you can't afford to lose. See [Optional hardening](#optional-hardening).
 
-If you find a way around a guardrail, or something on this page is wrong or missing, please [open an issue](https://github.com/nstuck/codehive/issues).
+If you find a way around a guardrail, please [report it privately](https://github.com/nstuck/codehive/security/advisories/new) so it can be fixed before it's public. If something on this page is wrong or missing, please [open an issue](https://github.com/nstuck/codehive/issues).
 
 ## Risks that come with Remote Control
 
