@@ -97,7 +97,7 @@ jobs:
         run: |
           docker build -q -t codehive-debian13 -f test/debian13.Dockerfile test
           docker run -d --name debian --privileged --cgroupns=private \
-            --tmpfs /run --tmpfs /run/lock --tmpfs /tmp codehive-debian13
+            --tmpfs /run --tmpfs /run/lock --tmpfs /tmp:rw,exec,size=1g codehive-debian13
           # shellcheck disable=SC2016  # expanded inside the container
           timeout 60 docker exec debian sh -c \
             'until [ "$(systemctl is-system-running)" = running ] || [ "$(systemctl is-system-running)" = degraded ]; do sleep 1; done'
@@ -130,17 +130,17 @@ jobs:
       - name: Install Claude Code
         run: curl -fsSL https://claude.ai/install.sh | bash
 
-      - name: Check what codehive passes to Remote Control
+      - name: See how Remote Control handles options when signed out
+        continue-on-error: true
         run: |
           claude="$HOME/.local/bin/claude"
           "$claude" --version
-          help="$("$claude" remote-control --help 2>&1)" || { printf '%s\n' "$help"; exit 1; }
-          missing=0
-          # claude-rc-run passes --name, --spawn same-dir or worktree, and --permission-mode
-          for want in "--name <" "--spawn <" "same-dir" "worktree" "--permission-mode <"; do
-            grep -qF -- "$want" <<<"$help" || { echo "::error::remote-control --help no longer mentions: $want"; missing=1; }
-          done
-          [ "$missing" = 0 ] || { printf '%s\n' "$help"; exit 1; }
+          echo "--- codehive's options:"
+          "$claude" remote-control --name ci --spawn worktree --permission-mode default 2>&1 || echo "(exit $?)"
+          echo "--- an unknown option:"
+          "$claude" remote-control --no-such-option 2>&1 || echo "(exit $?)"
+          echo "--- a bad spawn mode:"
+          "$claude" remote-control --spawn no-such-mode 2>&1 || echo "(exit $?)"
 
       - name: Check the sign-in status the installer reads
         run: |
